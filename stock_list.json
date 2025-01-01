@@ -1,6 +1,10 @@
 {
     "symbols": [
-        "AAPL", "MSFT"
-        
+        "AAPL", "MSFT", "GOOGL","TSLA", "AMZN", "META", "NVDA", "BRK-B", "JPM", "JNJ",
+        "V", "PG", "UNH", "HD", "MA", "BAC", "DIS", "ADBE", "CRM", "NFLX",
+        "PYPL", "INTC", "CSCO", "PEP", "KO", "MRK", "ABT", "ABBV", "T", "PFE",
+        "XOM", "CVX", "NKE", "WMT", "MCD", "COST", "LLY", "MDT", "NEE", "DHR",
+        "TXN", "AVGO", "QCOM", "HON", "UNP", "LIN", "PM", "ACN", "IBM", "ORCL",
+        "TMO", "BMY", "SBUX", "GS", "RTX", "AMGN", "CAT", "BA", "SPGI", "BLK"
     ]
 }

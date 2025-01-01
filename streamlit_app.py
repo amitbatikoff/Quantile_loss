@@ -80,6 +80,32 @@ def create_prediction_plot(day_data, input_data, actual_price, predictions, sele
     
     return fig
 
+def calculate_stock_performance(model, test_data):
+    performances = []
+    
+    for symbol in SYMBOLS:
+        if symbol in test_data:
+            dataset = StockDataset({symbol: test_data[symbol]})
+            if len(dataset) > 0:
+                for idx, (date, sym) in enumerate(dataset.date_symbols):
+                    if sym == symbol:
+                        try:
+                            input_values, actual_price, _ = prepare_input_data(dataset, idx)
+                            
+                            with torch.no_grad():
+                                input_tensor = torch.FloatTensor(input_values).unsqueeze(0)
+                                predictions = model(input_tensor)
+                                predictions = predictions.squeeze().numpy() + input_values[-1]
+                            
+                            # Convert numpy values to Python native types
+                            last_price = float(input_values[-1])
+                            performance = float(predictions[1]) - last_price
+                            performances.append((symbol, date, float(performance), float(last_price)))
+                        except Exception as e:
+                            continue
+    
+    return sorted(performances, key=lambda x: x[2], reverse=True)
+
 def main():
     st.title('Stock Price Prediction Visualization')
     
@@ -95,13 +121,31 @@ def main():
     # Load model with current trigger value
     model = load_model()
     
-    selected_stock = st.sidebar.selectbox('Select Stock', SYMBOLS)
-
-    # Get and process stock data for all symbols
     try:
-        stock_data = get_stock_data(SYMBOLS)  # Get data for all symbols
+        stock_data = get_stock_data(SYMBOLS)
         _, _, test_data = split_data(stock_data)
         
+        performances = calculate_stock_performance(model, test_data)
+        top_10_predictions = performances[:10]
+        
+        # Updated formatting to handle the values more safely
+        stock_options = []
+        for symbol, date, perf, last_price in top_10_predictions:
+            label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P20 diff: ${perf:.2f} from ${last_price:.2f})"
+            stock_options.append((label, (symbol, date)))
+        
+        if not stock_options:
+            st.error("No stocks available for prediction")
+            return
+            
+        selected_option = st.sidebar.radio(
+            "Select from top 10 performing predictions",
+            options=stock_options,
+            format_func=lambda x: x[0]
+        )
+        selected_stock, selected_date = selected_option[1]
+        
+        # Modified the rest of the main function to use the selected date directly
         if selected_stock in test_data:
             test_df = test_data[selected_stock]
             if test_df.empty:
@@ -111,22 +155,8 @@ def main():
             # Create dataset
             dataset = StockDataset({selected_stock: test_df})
             
-            # Filter dates that have enough data points
-            valid_dates = [date for date, _ in dataset.date_symbols 
-                          if len(dataset.grouped.get_group((date, selected_stock))) > 10]
-            
-            if not valid_dates:
-                st.error("No valid dates with sufficient data points found.")
-                return
-                
-            selected_date = st.sidebar.date_input(
-                'Select Date',
-                min_value=valid_dates[0],
-                max_value=valid_dates[-1],
-                value=valid_dates[0]
-            )
-
-            if selected_date in valid_dates:
+            # Use the selected date directly instead of showing date picker
+            if (selected_date, selected_stock) in dataset.date_symbols:
                 # Prepare input data
                 index = dataset.date_symbols.index((selected_date, selected_stock))
                 input_values, actual_price, day_data = prepare_input_data(dataset, index)
