@@ -43,3 +43,4 @@ checkpoints/
 unified_stock_model.pt
 *.log
 lightning_logs/
+cache/

@@ -2,10 +2,37 @@ import requests
 import pandas as pd
 from io import StringIO
 import time
-from config import API_KEY, BASE_URL
+import os
+from datetime import datetime, timedelta
+from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS
+
+def get_cache_path(symbol, interval):
+    if not os.path.exists(CACHE_DIR):
+        os.makedirs(CACHE_DIR)
+    return os.path.join(CACHE_DIR, f"{symbol}_{interval}.csv")
+
+def is_cache_valid(cache_path):
+    if not os.path.exists(cache_path):
+        return False
+    
+    cache_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
+    expiry_time = datetime.now() - timedelta(days=CACHE_EXPIRY_DAYS)
+    return cache_time > expiry_time
 
 def download_stock_data(symbol, interval="1min"):
+    cache_path = get_cache_path(symbol, interval)
+    
+    # Check cache first
+    if is_cache_valid(cache_path):
+        print(f"Loading cached data for {symbol}")
+        df = pd.read_csv(cache_path)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        return df
+
+    # If not in cache, download
+    print(f"Downloading fresh data for {symbol}")
     url = f"{BASE_URL}?function=TIME_SERIES_INTRADAY&symbol={symbol}&interval={interval}&apikey={API_KEY}&datatype=csv&extended_hours=false&outputsize=full"
+    
     try:
         response = requests.get(url)
         if response.status_code == 200:
@@ -13,6 +40,9 @@ def download_stock_data(symbol, interval="1min"):
             if df.empty:
                 raise ValueError(f"Empty data received for {symbol}")
             df['timestamp'] = pd.to_datetime(df['timestamp'])
+            
+            # Save to cache
+            df.to_csv(cache_path, index=False)
             return df
         elif response.status_code == 429:
             print(f"Rate limit exceeded for {symbol}. Waiting 60 seconds...")
