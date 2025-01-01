@@ -55,12 +55,18 @@ class StockPredictor(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=1e-5)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=5, verbose=True
-        )
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler,
-            "monitor": "val_loss"
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        scheduler_config = {
+            "scheduler": torch.optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=0.001,
+                epochs=1000,
+                steps_per_epoch=len(self.trainer.train_dataloader),
+                pct_start=0.3,  # Use 30% of training for warmup
+                div_factor=25.0,  # initial_lr = max_lr/25
+                final_div_factor=10000.0,  # min_lr = initial_lr/10000
+            ),
+            "interval": "step",
+            "frequency": 1,
         }
+        return {"optimizer": optimizer, "lr_scheduler": scheduler_config}

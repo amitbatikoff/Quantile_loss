@@ -41,16 +41,24 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=20,
+        patience=30,
         mode='min'
     )
 
-    # Initialize trainer
+    # Calculate total steps for the scheduler
+    total_steps = len(train_loader) * 1000  # 1000 is max_epochs
+
+    # Initialize lr scheduler callback
+    lr_scheduler = pl.callbacks.LearningRateMonitor(logging_interval='step')
+
+    # Initialize trainer with scheduler
     trainer = pl.Trainer(
         max_epochs=1000,
-        callbacks=[checkpoint_callback, early_stop_callback],
+        callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
-        deterministic=True
+        deterministic=True,
+        enable_model_summary=True,
+        gradient_clip_val=0.5,  # Added gradient clipping for stability
     )
 
     # Train model
