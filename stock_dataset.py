@@ -26,6 +26,6 @@ class StockDataset(Dataset):
         target_idx = int(total_len * self.target_ratio)
 
         input_data = day_data.iloc[:input_len][['close']].values.astype('float32')
-        target_data = day_data.iloc[target_idx]['close'].astype('float32')
+        target_data = day_data.iloc[target_idx]['close'].astype('float32')-input_data[-1]
 
         return torch.tensor(input_data, dtype=torch.float32), torch.tensor([target_data], dtype=torch.float32)

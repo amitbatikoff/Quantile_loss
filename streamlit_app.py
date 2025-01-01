@@ -3,37 +3,37 @@ import pandas as pd
 import plotly.graph_objects as go
 import torch
 from predictor import StockPredictor
-from data_loader import get_stock_data
+from data_loader import get_stock_data, split_data
 from config import SYMBOLS, MODEL_PARAMS
 import numpy as np
+from torch.utils.data import DataLoader
+from stock_dataset import StockDataset
+import plotly.express as px
 
 @st.cache_resource
 def load_model(_trigger=False):  # Add trigger parameter
     input_size = 273  # Match the saved model architecture
-    model = StockPredictor(input_size=input_size, hidden_dim=MODEL_PARAMS["hidden_dim"])
+    model = StockPredictor(input_size=input_size)
     model.load_state_dict(torch.load('unified_stock_model.pt'))
     model.eval()
     return model
 
 @st.cache_data
 def load_stock_data():
-    return get_stock_data(SYMBOLS)
+    stock_data = get_stock_data(SYMBOLS)
+    train, val, test = split_data(stock_data)
+    return train, val, test
 
-def prepare_input_data(df, date):
-    day_data = df[df['timestamp'].dt.date == date].sort_values('timestamp')
-    total_len = len(day_data)
-    input_len = int(total_len * MODEL_PARAMS['input_ratio'])
-    target_idx = int(total_len * MODEL_PARAMS['target_ratio'])
-    
-    input_data = day_data.iloc[:input_len]['close'].values
-    actual_price = day_data.iloc[target_idx]['close']
-    
-    return input_data, actual_price, day_data
+def prepare_input_data(dataset, index):
+    input_data, actual_price = dataset[index]
+    actual_price += input_data[-1].item()
+    return input_data.numpy(), actual_price.item(), dataset.data
 
-def create_prediction_plot(day_data, input_data, actual_price, predicted_price, selected_date):
+def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date):
     fig = go.Figure()
     
-    # Plot all daily data points
+    # Plot historical data
+    day_data = day_data[day_data['timestamp'].dt.date == selected_date]
     fig.add_trace(go.Scatter(
         x=day_data['timestamp'],
         y=day_data['close'],
@@ -41,7 +41,7 @@ def create_prediction_plot(day_data, input_data, actual_price, predicted_price, 
         line=dict(color='lightgray', dash='dot')
     ))
     
-    # Plot input data used for prediction
+    # Plot input data
     input_times = day_data['timestamp'].iloc[:len(input_data)]
     fig.add_trace(go.Scatter(
         x=input_times,
@@ -50,7 +50,7 @@ def create_prediction_plot(day_data, input_data, actual_price, predicted_price, 
         line=dict(color='blue')
     ))
     
-    # Plot actual and predicted prices
+    # Plot actual price
     target_time = day_data['timestamp'].iloc[int(len(day_data) * MODEL_PARAMS['target_ratio'])]
     fig.add_trace(go.Scatter(
         x=[target_time],
@@ -60,13 +60,16 @@ def create_prediction_plot(day_data, input_data, actual_price, predicted_price, 
         marker=dict(color='green', size=10)
     ))
     
-    fig.add_trace(go.Scatter(
-        x=[target_time],
-        y=[predicted_price],
-        name='Predicted Price',
-        mode='markers',
-        marker=dict(color='red', size=10)
-    ))
+    # Plot predicted quantiles
+    colors = px.colors.qualitative.Set3
+    for i, quantile in enumerate(MODEL_PARAMS['quantiles']):
+        fig.add_trace(go.Scatter(
+            x=[target_time],
+            y=[predictions[i]],
+            name=f'P{int(quantile*100)}',
+            mode='markers',
+            marker=dict(color=colors[i % len(colors)], size=8)
+        ))
     
     fig.update_layout(
         title=f'Stock Price Prediction for {selected_date}',
@@ -92,59 +95,83 @@ def main():
     # Load model with current trigger value
     model = load_model()
     
-    # Rest of the main function remains the same
-    stock_data = load_stock_data()
-    
     selected_stock = st.sidebar.selectbox('Select Stock', SYMBOLS)
-    
-    # Get data for selected stock
-    df = stock_data[selected_stock]
-    
-    # Group by date to ensure we have complete days
-    daily_groups = df.groupby(df['timestamp'].dt.date)
-    available_dates = sorted(daily_groups.groups.keys())
-    
-    # Filter dates that have enough data points
-    valid_dates = [date for date in available_dates 
-                  if len(daily_groups.get_group(date)) > 10]  # Minimum data points threshold
-    
-    if not valid_dates:
-        st.error("No valid dates with sufficient data points found.")
-        return
-    
-    selected_date = st.sidebar.date_input(
-        'Select Date',
-        min_value=valid_dates[0],
-        max_value=valid_dates[-1],
-        value=valid_dates[0]
-    )
 
-    if selected_date in valid_dates:
-        # Prepare input data
-        input_values, actual_price, day_data = prepare_input_data(df, selected_date)
+    # Get and process stock data for all symbols
+    try:
+        stock_data = get_stock_data(SYMBOLS)  # Get data for all symbols
+        _, _, test_data = split_data(stock_data)
         
-        # Get prediction
-        with torch.no_grad():
-            input_tensor = torch.FloatTensor(input_values).unsqueeze(0)
-            predicted_price = model(input_tensor).item()
-        
-        # Create and display the plot
-        fig = create_prediction_plot(
-            day_data,
-            input_values,
-            actual_price,
-            predicted_price,
-            selected_date
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Display prediction details
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Actual Price", f"${actual_price:.2f}")
-        col2.metric("Predicted Price", f"${predicted_price:.2f}")
-        col3.metric("Difference", f"${(predicted_price - actual_price):.2f}")
-    else:
-        st.warning('No data available for the selected date.')
+        if selected_stock in test_data:
+            test_df = test_data[selected_stock]
+            if test_df.empty:
+                st.error(f"No data available for {selected_stock}")
+                return
+                
+            # Create dataset
+            dataset = StockDataset({selected_stock: test_df})
+            
+            # Filter dates that have enough data points
+            valid_dates = [date for date, _ in dataset.date_symbols 
+                          if len(dataset.grouped.get_group((date, selected_stock))) > 10]
+            
+            if not valid_dates:
+                st.error("No valid dates with sufficient data points found.")
+                return
+                
+            selected_date = st.sidebar.date_input(
+                'Select Date',
+                min_value=valid_dates[0],
+                max_value=valid_dates[-1],
+                value=valid_dates[0]
+            )
+
+            if selected_date in valid_dates:
+                # Prepare input data
+                index = dataset.date_symbols.index((selected_date, selected_stock))
+                input_values, actual_price, day_data = prepare_input_data(dataset, index)
+                
+                # Get prediction
+                with torch.no_grad():
+                    input_tensor = torch.FloatTensor(input_values).unsqueeze(0)
+                    predictions = model(input_tensor)
+                    predictions = predictions.squeeze().numpy() + input_values[-1]
+                
+                # Create and display the plot
+                fig = create_prediction_plot(
+                    day_data,
+                    input_values,
+                    actual_price,
+                    predictions,
+                    selected_date
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Display prediction details in an expandable section
+                with st.expander("View Quantile Predictions"):
+                    cols = st.columns(3)
+                    for i, quantile in enumerate(MODEL_PARAMS['quantiles']):
+                        col_idx = i % 3
+                        cols[col_idx].metric(
+                            f"P{int(quantile*100)} Prediction", 
+                            f"${predictions[i]:.2f}",
+                            f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
+                        )
+                
+                # Display main metrics
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Actual Price", f"${actual_price:.2f}")
+                col2.metric("Median (P50)", f"${predictions[4]:.2f}")  # 0.5 quantile
+                col3.metric("Prediction Interval", 
+                           f"${predictions[0]:.2f} - ${predictions[-1]:.2f}")  # P10-P90
+            else:
+                st.warning('No data available for the selected date.')
+        else:
+            st.error(f"Failed to load test data for {selected_stock}")
+            return
+    except Exception as e:
+        st.error(f"Error loading stock data: {str(e)}")
+        return
 
 if __name__ == '__main__':
     main()

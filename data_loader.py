@@ -53,6 +53,7 @@ def download_stock_data(symbol, interval="1min"):
         print(f"Error downloading data for {symbol}: {str(e)}")
         return None
 
+    
 def get_stock_data(symbols):
     stock_data = {}
     all_timestamps = set()

@@ -5,7 +5,7 @@ import multiprocessing
 from stock_dataset import StockDataset
 from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
-from config import SYMBOLS, MODEL_PARAMS
+from config import SYMBOLS, DATALOADER_PARAMS
 
 def main():
     # Get and process data
@@ -16,19 +16,22 @@ def main():
     num_workers = min(multiprocessing.cpu_count() - 1, 11)
 
     # Create dataloaders with workers
-    train_loader = DataLoader(StockDataset(train), batch_size=128, shuffle=True, 
+    train_loader = DataLoader(StockDataset(train), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=True, 
                             num_workers=num_workers, pin_memory=True, persistent_workers=True)
-    val_loader = DataLoader(StockDataset(val), batch_size=128, shuffle=False,
+    val_loader = DataLoader(StockDataset(val), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
                           num_workers=num_workers, pin_memory=True, persistent_workers=True)
-    test_loader = DataLoader(StockDataset(test), batch_size=128, shuffle=False,
+    test_loader = DataLoader(StockDataset(test), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
                            num_workers=num_workers, pin_memory=True, persistent_workers=True)
 
     # Get input size from a sample batch
     sample_batch = next(iter(train_loader))
     input_size = sample_batch[0].shape[1]
 
-    # Initialize model
-    model = StockPredictor(input_size=input_size, hidden_dim=MODEL_PARAMS["hidden_dim"])
+    # Calculate total steps for the scheduler
+    total_steps = len(train_loader) * 1000  # 1000 is max_epochs
+
+    # Initialize model with total_steps
+    model = StockPredictor(input_size=input_size, total_steps=total_steps)
 
     # Setup callbacks
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
@@ -41,12 +44,9 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=30,
+        patience=100,
         mode='min'
     )
-
-    # Calculate total steps for the scheduler
-    total_steps = len(train_loader) * 1000  # 1000 is max_epochs
 
     # Initialize lr scheduler callback
     lr_scheduler = pl.callbacks.LearningRateMonitor(logging_interval='step')
