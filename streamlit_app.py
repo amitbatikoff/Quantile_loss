@@ -32,8 +32,11 @@ def prepare_input_data(dataset, index):
 def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date):
     fig = go.Figure()
     
+    # Filter data for selected date and convert to DataFrame to ensure proper indexing
+    day_data = day_data[day_data['timestamp'].dt.date == selected_date].copy()
+    day_data.reset_index(drop=True, inplace=True)
+    
     # Plot historical data
-    day_data = day_data[day_data['timestamp'].dt.date == selected_date]
     fig.add_trace(go.Scatter(
         x=day_data['timestamp'],
         y=day_data['close'],
@@ -41,17 +44,25 @@ def create_prediction_plot(day_data, input_data, actual_price, predictions, sele
         line=dict(color='lightgray', dash='dot')
     ))
     
-    # Plot input data
-    input_times = day_data['timestamp'].iloc[:len(input_data)]
+    # Plot input data - fixed alignment to start from beginning of day
+    input_times = day_data['timestamp'].iloc[:len(input_data)]  # Take first portion instead of last
+    input_values = [float(x) for x in input_data]
+    
     fig.add_trace(go.Scatter(
         x=input_times,
-        y=input_data,
+        y=input_values,
         name='Input Data',
-        line=dict(color='blue')
+        line=dict(color='blue', width=3),
+        mode='lines+markers',
+        marker=dict(size=8, color='blue'),
+        opacity=1
     ))
     
+    # Plot actual price and predictions
+    target_idx = int(len(day_data) * MODEL_PARAMS['target_ratio'])
+    target_time = day_data['timestamp'].iloc[target_idx]
+    
     # Plot actual price
-    target_time = day_data['timestamp'].iloc[int(len(day_data) * MODEL_PARAMS['target_ratio'])]
     fig.add_trace(go.Scatter(
         x=[target_time],
         y=[actual_price],
