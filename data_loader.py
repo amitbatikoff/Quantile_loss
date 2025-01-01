@@ -9,7 +9,7 @@ from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS
 def get_cache_path(symbol, interval):
     if not os.path.exists(CACHE_DIR):
         os.makedirs(CACHE_DIR)
-    return os.path.join(CACHE_DIR, f"{symbol}_{interval}.csv")
+    return os.path.join(CACHE_DIR, f"{symbol}_{interval}.parquet")
 
 def is_cache_valid(cache_path):
     if not os.path.exists(cache_path):
@@ -25,8 +25,7 @@ def download_stock_data(symbol, interval="1min"):
     # Check cache first
     if is_cache_valid(cache_path):
         print(f"Loading cached data for {symbol}")
-        df = pd.read_csv(cache_path)
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df = pd.read_parquet(cache_path)
         return df
 
     # If not in cache, download
@@ -42,7 +41,7 @@ def download_stock_data(symbol, interval="1min"):
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             
             # Save to cache
-            df.to_csv(cache_path, index=False)
+            df.to_parquet(cache_path, index=False)
             return df
         elif response.status_code == 429:
             print(f"Rate limit exceeded for {symbol}. Waiting 60 seconds...")
