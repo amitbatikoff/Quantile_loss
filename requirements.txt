@@ -1,6 +1,9 @@
- requests
- pandas
- numpy
- torch
- pytorch-lightning
- matplotlib
+requests
+pandas
+numpy
+torch
+pytorch-lightning
+matplotlib
+dash-bootstrap-components 
+plotly
+streamlit
