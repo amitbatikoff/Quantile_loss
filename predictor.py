@@ -19,13 +19,19 @@ class StockPredictor(pl.LightningModule):
         self.save_hyperparameters()
         self.model = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(input_size, hidden_dim),
+            nn.Linear(input_size, 1024),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(1024, 1024),
             nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(hidden_dim, 1)
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
         )
         self.loss_fn = QuantileLoss(quantile=0.5)
 
