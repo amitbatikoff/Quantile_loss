@@ -8,7 +8,7 @@ from config import SYMBOLS, MODEL_PARAMS
 import numpy as np
 
 @st.cache_resource
-def load_model():
+def load_model(_trigger=False):  # Add trigger parameter
     input_size = 273  # Match the saved model architecture
     model = StockPredictor(input_size=input_size, hidden_dim=MODEL_PARAMS["hidden_dim"])
     model.load_state_dict(torch.load('unified_stock_model.pt'))
@@ -80,12 +80,21 @@ def create_prediction_plot(day_data, input_data, actual_price, predicted_price, 
 def main():
     st.title('Stock Price Prediction Visualization')
     
-    # Load model and data
-    model = load_model()
-    stock_data = load_stock_data()
-    
     # Sidebar controls
     st.sidebar.header('Select Parameters')
+    
+    # Add reload model button
+    if st.sidebar.button('Reload Model'):
+        # Clear the cache for load_model
+        load_model.clear()
+        st.sidebar.success('Model reloaded!')
+    
+    # Load model with current trigger value
+    model = load_model()
+    
+    # Rest of the main function remains the same
+    stock_data = load_stock_data()
+    
     selected_stock = st.sidebar.selectbox('Select Stock', SYMBOLS)
     
     # Get data for selected stock
