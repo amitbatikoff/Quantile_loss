@@ -61,7 +61,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=30,
+        patience=50,
         mode='min'
     )
 
@@ -76,6 +76,9 @@ def main():
         deterministic=True,
         enable_model_summary=True,
         gradient_clip_val=0.5,  # Added gradient clipping for stability
+        enable_progress_bar=True,
+        progress_bar_refresh_rate=1,
+        new_line_after_epoch=True  # Add this line to create new line after each epoch
     )
 
     # Train model

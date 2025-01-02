@@ -132,10 +132,12 @@ def calculate_stock_performance(model, test_data):
                             
                             # Convert numpy values to Python native types
                             last_price = float(input_values[-1])
-                            performance = float(predictions[1]) - last_price
-                            performances.append((symbol, date, float(performance), float(last_price)))
+                            min_prediction = float(np.min(predictions))  
+                            performance = (min_prediction - last_price)/max(0.1, last_price)
+                            performances.append((symbol, date, performance, last_price))
                         except Exception as e:
-                            continue
+                            print(f"Error calculating performance for {symbol} on {date}: {str(e)}")
+                            raise
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
 
@@ -163,7 +165,7 @@ def main():
     # Updated formatting to handle the values more safely
     stock_options = []
     for symbol, date, perf, last_price in top_10_predictions:
-        label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P20 diff: ${perf:.2f} from ${last_price:.2f})"
+        label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf/last_price*100:.2f}%)"
         stock_options.append((label, (symbol, date)))
     
     if not stock_options:

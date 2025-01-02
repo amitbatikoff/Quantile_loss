@@ -80,13 +80,13 @@ class StockPredictor(pl.LightningModule):
             "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer,
                 mode='min',
-                factor=0.01,
+                factor=0.05,
                 patience=10,
-                threshold=5.0,
+                threshold=0.3,
                 min_lr=1e-6,
                 threshold_mode = 'abs'
             ),
-            "monitor": "train_loss",
+            "monitor": "val_loss",
             "interval": "epoch",
             "frequency": 1,
         }
