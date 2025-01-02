@@ -14,7 +14,7 @@ MODEL_PARAMS = {
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "architecture": {
-        "hidden_sizes": [512, 512, 256, 64],  # List of hidden layer sizes
+        "hidden_sizes": [512, 512, 256, 256, 128, 128, 64, 64],  # List of hidden layer sizes
         "default_input_size": 195  # Fallback input size
     }
 }

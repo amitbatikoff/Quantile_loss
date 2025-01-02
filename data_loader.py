@@ -6,10 +6,11 @@ import os
 from datetime import datetime, timedelta
 from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS
 
-def get_cache_path(symbol, interval):
+def get_cache_path(symbol, interval, month=None):
     if not os.path.exists(CACHE_DIR):
         os.makedirs(CACHE_DIR)
-    return os.path.join(CACHE_DIR, f"{symbol}_{interval}.parquet")
+    cache_file = f"{symbol}_{interval}.parquet" if month is None else f"{symbol}_{interval}_{month}.parquet"
+    return os.path.join(CACHE_DIR, cache_file)
 
 def is_cache_valid(cache_path):
     if not os.path.exists(cache_path):
@@ -19,18 +20,20 @@ def is_cache_valid(cache_path):
     expiry_time = datetime.now() - timedelta(days=CACHE_EXPIRY_DAYS)
     return cache_time > expiry_time
 
-def download_stock_data(symbol, interval="1min"):
-    cache_path = get_cache_path(symbol, interval)
+def download_stock_data(symbol, interval="1min", month=None):
+    cache_path = get_cache_path(symbol, interval, month)
     
     # Check cache first
     if is_cache_valid(cache_path):
-        print(f"Loading cached data for {symbol}")
-        df = pd.read_parquet(cache_path)
-        return df
+        print(f"Loading cached data for {symbol} {'(current)' if month is None else f'({month})'}")
+        return pd.read_parquet(cache_path)
 
     # If not in cache, download
-    print(f"Downloading fresh data for {symbol}")
-    url = f"{BASE_URL}?function=TIME_SERIES_INTRADAY&symbol={symbol}&interval={interval}&apikey={API_KEY}&datatype=csv&extended_hours=false&outputsize=full"
+    print(f"Downloading fresh data for {symbol} {'(current)' if month is None else f'({month})'}")
+    
+    # Build URL based on whether we're getting current or future data
+    base_url = f"{BASE_URL}?function=TIME_SERIES_INTRADAY&symbol={symbol}&interval={interval}&apikey={API_KEY}&datatype=csv&extended_hours=false&outputsize=full"
+    url = f"{base_url}&month={month}" if month else base_url
     
     try:
         response = requests.get(url)
@@ -39,32 +42,37 @@ def download_stock_data(symbol, interval="1min"):
             if df.empty:
                 raise ValueError(f"Empty data received for {symbol}")
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
-            # Save to cache
             df.to_parquet(cache_path, index=False)
             return df
         elif response.status_code == 429:
             print(f"Rate limit exceeded for {symbol}. Waiting 60 seconds...")
             time.sleep(60)
-            return download_stock_data(symbol, interval)
+            return download_stock_data(symbol, interval, month)
         else:
             raise ValueError(f"Error fetching data for {symbol}: {response.status_code}")
     except Exception as e:
         print(f"Error downloading data for {symbol}: {str(e)}")
         return None
 
-    
 def get_stock_data(symbols):
     stock_data = {}
     all_timestamps = set()
     
     for symbol in symbols:
-        print(f"Downloading data for {symbol}...")
-        df = download_stock_data(symbol)
-        if df is not None:
+        # Download current data
+        current_df = download_stock_data(symbol)
+        
+        # Download June 2024 data
+        future_df = download_stock_data(symbol, month="2024-06")
+        
+        # Combine the dataframes if both are available
+        if current_df is not None and future_df is not None:
+            df = pd.concat([current_df, future_df], ignore_index=True)
+            df = df.drop_duplicates(subset=['timestamp'], keep='first')
             stock_data[symbol] = df
             all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
     
+    # Rest of the function remains the same
     all_timestamps = sorted(list(all_timestamps))
     
     for symbol in stock_data:
