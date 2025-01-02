@@ -160,11 +160,12 @@ def main():
     test_data = load_stock_data()
     
     performances = calculate_stock_performance(model, test_data)
-    top_10_predictions = performances[:10]
+    top_15_predictions = performances[:15]
+    print(top_15_predictions)
     
     # Updated formatting to handle the values more safely
     stock_options = []
-    for symbol, date, perf, last_price in top_10_predictions:
+    for symbol, date, perf, last_price in top_15_predictions:
         label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf*100:.2f}%)"
         stock_options.append((label, (symbol, date)))
     
@@ -211,6 +212,18 @@ def main():
             )
             st.plotly_chart(fig, use_container_width=True)
             
+            # Display main metrics
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Last input", f"${input_values[-1]:.2f}")
+            col2.metric("Median (P50)", f"${predictions[4]:.2f}")  # 0.5 quantile
+            col3.metric("Prediction Interval", 
+                        f"${predictions[0]:.2f} - ${predictions[-1]:.2f}")  # P10-P90
+
+            # Display main metrics
+            col1, col2 = st.columns(2)
+            col1.metric("P10 change", f"{100*(np.min(predictions)-input_values[-1])/input_values[-1]:.2f}%")
+            col2.metric("P50 change", f"{100*(np.median(predictions)-input_values[-1])/input_values[-1]:.2f}%")
+
             # Display prediction details in an expandable section
             with st.expander("View Quantile Predictions"):
                 cols = st.columns(3)
@@ -221,13 +234,7 @@ def main():
                         f"${predictions[i]:.2f}",
                         f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
                     )
-            
-            # Display main metrics
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Actual Price", f"${actual_price:.2f}")
-            col2.metric("Median (P50)", f"${predictions[4]:.2f}")  # 0.5 quantile
-            col3.metric("Prediction Interval", 
-                        f"${predictions[0]:.2f} - ${predictions[-1]:.2f}")  # P10-P90
+
         else:
             st.warning('No data available for the selected date.')
     else:

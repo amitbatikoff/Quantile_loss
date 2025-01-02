@@ -15,13 +15,14 @@ def collate_fn(batch):
     # Pad or truncate each input sequence
     processed_inputs = []
     for seq in inputs:
-        if len(seq) > max_len:
-            processed_inputs.append(seq[-max_len:])  # Take last max_len elements
-        else:
-            # Pad with zeros at the beginning
-            padding = torch.zeros(max_len - len(seq))
-            processed_inputs.append(torch.cat([padding, seq]))
-    
+        # if len(seq) > max_len:
+        #     processed_inputs.append(seq[-max_len:])  # Take last max_len elements
+        # else:
+        #     # Pad with zeros at the beginning
+        #     padding = torch.zeros(max_len - len(seq))
+        #     processed_inputs.append(torch.cat([padding, seq]))
+        processed_inputs.append(seq) 
+
     return torch.stack(processed_inputs), torch.stack(targets)
 
 def main():
@@ -61,7 +62,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=50,
+        patience=100,
         mode='min'
     )
 
@@ -70,15 +71,13 @@ def main():
 
     # Initialize trainer with scheduler
     trainer = pl.Trainer(
-        max_epochs=1000,
+        max_epochs=2000,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,
         enable_model_summary=True,
         gradient_clip_val=0.5,  # Added gradient clipping for stability
         enable_progress_bar=True,
-        progress_bar_refresh_rate=1,
-        new_line_after_epoch=True  # Add this line to create new line after each epoch
     )
 
     # Train model

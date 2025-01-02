@@ -4,6 +4,7 @@ from data_loader import get_stock_data, split_data
 from config import SYMBOLS, MODEL_PARAMS
 from stock_dataset import StockDataset
 import logging
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.INFO,
@@ -21,7 +22,7 @@ def load_debug_model():
         logging.error(f"Error loading model: {str(e)}")
         return None
 
-def debug_performance(model, test_data, verbose=True):
+def debug_performance(model, test_data, verbose=False):
     performances = []
     
     for symbol in SYMBOLS:
@@ -53,7 +54,7 @@ def debug_performance(model, test_data, verbose=True):
                 # Calculate performance using P20 and P80
                 p20_idx = MODEL_PARAMS['quantiles'].index(0.2)
                 p80_idx = MODEL_PARAMS['quantiles'].index(0.8)
-                performance = (min(predictions[p20_idx], predictions[p80_idx]) - last_input_price) / max(0.1, last_input_price)
+                performance = (np.min(predictions) - last_input_price) / max(0.1, last_input_price)
 
                 if verbose:
                     logging.info(f"\nSymbol: {symbol}, Date: {date}")
