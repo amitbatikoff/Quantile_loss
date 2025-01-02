@@ -37,8 +37,8 @@ def load_model(_trigger=False):
 @st.cache_data
 def load_stock_data():
     stock_data = get_stock_data(SYMBOLS)
-    train, val, test = split_data(stock_data)
-    return train, val, test
+    _, _, test_data = split_data(stock_data)
+    return test_data
 
 def prepare_input_data(dataset, index):
     input_data, actual_price = dataset[index]
@@ -156,8 +156,8 @@ def main():
     # Load model with current trigger value
     model = load_model()
     
-    stock_data = get_stock_data(SYMBOLS)
-    _, _, test_data = split_data(stock_data)
+    # Use cached stock data
+    test_data = load_stock_data()
     
     performances = calculate_stock_performance(model, test_data)
     top_10_predictions = performances[:10]
@@ -165,7 +165,7 @@ def main():
     # Updated formatting to handle the values more safely
     stock_options = []
     for symbol, date, perf, last_price in top_10_predictions:
-        label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf/last_price*100:.2f}%)"
+        label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf*100:.2f}%)"
         stock_options.append((label, (symbol, date)))
     
     if not stock_options:
