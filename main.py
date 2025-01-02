@@ -7,6 +7,23 @@ from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
 from config import SYMBOLS, DATALOADER_PARAMS
 
+def collate_fn(batch):
+    # Pad or truncate sequences to match model's expected input size
+    inputs, targets = zip(*batch)
+    max_len = 195  # Expected input size
+    
+    # Pad or truncate each input sequence
+    processed_inputs = []
+    for seq in inputs:
+        if len(seq) > max_len:
+            processed_inputs.append(seq[-max_len:])  # Take last max_len elements
+        else:
+            # Pad with zeros at the beginning
+            padding = torch.zeros(max_len - len(seq))
+            processed_inputs.append(torch.cat([padding, seq]))
+    
+    return torch.stack(processed_inputs), torch.stack(targets)
+
 def main():
     # Get and process data
     stock_data = get_stock_data(SYMBOLS)
@@ -17,11 +34,11 @@ def main():
 
     # Create dataloaders with workers
     train_loader = DataLoader(StockDataset(train), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=True, 
-                            num_workers=num_workers, pin_memory=True, persistent_workers=True)
+                            num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
     val_loader = DataLoader(StockDataset(val), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
-                          num_workers=num_workers, pin_memory=True, persistent_workers=True)
+                          num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
     test_loader = DataLoader(StockDataset(test), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
-                           num_workers=num_workers, pin_memory=True, persistent_workers=True)
+                           num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
 
     # Get input size from a sample batch
     sample_batch = next(iter(train_loader))
@@ -44,7 +61,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=100,
+        patience=30,
         mode='min'
     )
 

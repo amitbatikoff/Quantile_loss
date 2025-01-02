@@ -10,13 +10,17 @@ with open(os.path.join(os.path.dirname(__file__), 'stock_list.json'), 'r') as f:
 
 MODEL_PARAMS = {
     "learning_rate": 1e-5,
-    "input_ratio": 0.7,  # Added for consistency
-    "target_ratio": 0.9,  # Added for consistency
-    "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    "input_ratio": 0.5,  # Added for consistency
+    "target_ratio": 0.6,  # Added for consistency
+    "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "architecture": {
+        "hidden_sizes": [512, 512, 256, 64],  # List of hidden layer sizes
+        "default_input_size": 195  # Fallback input size
+    }
 }
 
 DATALOADER_PARAMS = {
-    "batch_size": 1024,
+    "batch_size": 4096,
     "pin_memory": True
 }
 

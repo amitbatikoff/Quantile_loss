@@ -26,21 +26,32 @@ class StockPredictor(pl.LightningModule):
         super(StockPredictor, self).__init__()
         self.save_hyperparameters()
         self.total_steps = total_steps
-        self.quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        self.quantiles = MODEL_PARAMS['quantiles']
         
-        self.model = nn.Sequential(
+        # Build model dynamically based on config
+        layers = []
+        
+        # Input layer
+        prev_size = input_size
+        layers.extend([
             nn.Flatten(),
-            nn.Linear(input_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, 64),
-            nn.ReLU(),
-            nn.Linear(64, len(self.quantiles))  # Output one value per quantile
-        )
+        ])
         
+        # Hidden layers
+        for i, hidden_size in enumerate(MODEL_PARAMS['architecture']['hidden_sizes']):
+            layers.extend([
+                nn.Linear(prev_size, hidden_size),
+                nn.ReLU(),
+            ])
+            # Add dropout after first two layers
+            if i < 2:
+                layers.append(nn.Dropout(p=0.1))
+            prev_size = hidden_size
+        
+        # Output layer
+        layers.append(nn.Linear(prev_size, len(self.quantiles)))
+        
+        self.model = nn.Sequential(*layers)
         self.loss_fn = QuantileLoss(self.quantiles)
 
     def forward(self, x):
