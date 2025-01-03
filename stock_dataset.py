@@ -34,10 +34,6 @@ class StockDataset(Dataset):
                 except Exception as e:
                     raise ValueError(f"Error processing timestamps for {symbol}: {str(e)}")
 
-    def _calculate_diffs(self, prices):
-        """Calculate price differences."""
-        return np.diff(prices, prepend=prices[0])
-
     def __len__(self):
         return len(self.date_symbols)
 
@@ -58,9 +54,14 @@ class StockDataset(Dataset):
         # Convert to tensors
         if self.mode == 'train':
             # For training, use price differences
-            diffs = self._calculate_diffs(input_values)
-            normalized_diffs = (11*(diffs - diffs.min()) / (diffs.max() - diffs.min())).astype(np.uint8)
-            input_tensor = torch.tensor(normalized_diffs, dtype=torch.uint8)
+            diffs = np.diff(input_values, prepend=input_values[0])
+            max_diff = diffs.max()
+            min_diff = diffs.min()
+            if (max_diff - min_diff) == 0:
+                normalized_diffs = np.zeros_like(diffs)
+            else:
+                normalized_diffs = (11*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
+            input_tensor = torch.tensor(normalized_diffs, dtype=torch.float)
         else:
             # For visualization, use raw prices
             input_tensor = torch.FloatTensor(input_values)
