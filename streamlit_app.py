@@ -17,30 +17,21 @@ import debugpy
 @st.cache_resource
 def load_model(_trigger=False):
     """Load model with architecture validation"""
-    try:
-        # First try to get input size from saved model
-        state_dict = torch.load('unified_stock_model.pt', map_location=torch.device('cpu'))
-        input_size = state_dict['model.1.weight'].shape[1]  # Get input size from first layer
+    # First try to get input size from saved model
+    state_dict = torch.load('unified_stock_model.pt', map_location=torch.device('cpu'))
+    input_size = state_dict['model.1.weight'].shape[1]  # Get input size from first layer
+    
+    # Initialize model with detected input size
+    model = StockPredictor(input_size=int(input_size))  # Ensure input_size is int
+    model.load_state_dict(state_dict)
+    model.eval()
+    
+    # Verify initialization
+    if not hasattr(model, '_input_size'):
+        raise AttributeError("Model initialization failed: _input_size not set")
+    
+    return model
         
-        # Initialize model with detected input size
-        model = StockPredictor(input_size=int(input_size))  # Ensure input_size is int
-        model.load_state_dict(state_dict)
-        model.eval()
-        
-        # Verify initialization
-        if not hasattr(model, '_input_size'):
-            raise AttributeError("Model initialization failed: _input_size not set")
-        
-        return model
-        
-    except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        # Use default input size from config
-        default_size = 24  # Set a reasonable default
-        st.warning(f"Using fallback input size: {default_size}")
-        model = StockPredictor(input_size=default_size)
-        model.eval()
-        return model
 
 @st.cache_data
 def load_stock_data():
@@ -251,13 +242,10 @@ def plot_training_metrics(metrics_df):
     return fig
 
 def main():
-    
     # Sidebar controls
     st.sidebar.header('Select Parameters')
     
-    # Add reload model button
     if st.sidebar.button('Reload Model'):
-        # Clear the cache for load_model
         load_model.clear()
         st.sidebar.success('Model reloaded!')
     
@@ -268,15 +256,36 @@ def main():
         st.title('Stock Price Prediction Visualization')
 
     # Load model with current trigger value
-    model = load_model()
-    
-    # Use cached stock data
-    test_data = load_stock_data()
+    model_loaded = True
+    try:
+        model = load_model()
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        model_loaded = False
 
-        # Create tabs
+    # Create tabs
     tab1, tab2 = st.tabs(["Predictions", "Training Metrics"])
 
+    # If model failed to load, automatically switch to tab 2
+    if not model_loaded:
+        tab1.error("Predictions tab disabled - Model failed to load")
+        with tab2:
+            st.header("Training Metrics")
+            metrics_df = load_latest_metrics()
+            
+            if metrics_df is not None:
+                fig = plot_training_metrics(metrics_df)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                    with st.expander("View Raw Metrics Data"):
+                        st.dataframe(metrics_df)
+            else:
+                st.warning("No training metrics found. Start training to see metrics here.")
+        return
+
+    # Rest of the code only executes if model loaded successfully
     with tab1:
+        test_data = load_stock_data()
         performances = calculate_stock_performance(model, test_data)
         top_15_predictions = performances[:15]
         

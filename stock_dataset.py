@@ -58,18 +58,18 @@ class StockDataset(Dataset):
             max_diff = diffs.max()
             min_diff = diffs.min()
             if (max_diff - min_diff) == 0:
-                normalized_diffs = torch.tensor(np.zeros_like(diffs), dtype=torch.float)
+                normalized_diffs = np.zeros_like(diffs)
             else:
                 normalized_diffs = (11*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
-            input_tensor = torch.tensor(normalized_diffs, dtype=torch.float)
+            input_tensor = torch.from_numpy(normalized_diffs).float()
         else:
             # For visualization, use raw prices
-            input_tensor = torch.tensor(input_values, dtype=torch.float)
+            input_tensor = torch.from_numpy(input_values).float()
 
         target_value = (day_data['close'].iloc[target_split:] - day_data['close'].iloc[input_split-1]).max()            
-        target_tensor = torch.FloatTensor([target_value])
-        
-        return input_tensor, target_tensor
+        target_tensor = torch.tensor([target_value], dtype=torch.float)
+
+        return input_tensor.clone().detach(), target_tensor.clone().detach()
 
     def find_date_index(self, target_date):
         """Find the index for a specific date in the dataset"""
