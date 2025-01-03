@@ -14,9 +14,9 @@ MODEL_PARAMS = {
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "architecture": {
-        "hidden_sizes":   [512 , 512 , 256 , 256 , 128  , 128  , 64   , 32   ], 
-        "dropout_rates":  [0.2 , 0.2 , 0.2 , 0.2 , 0.2  , 0.1  , 0.0  , 0.0  ], 
-        "use_batch_norm": [True, True, True, True, False, False, False, False], 
+        "hidden_sizes":   [512 , 256  , 128  , 64   , 32   ], 
+        "dropout_rates":  [0.2 , 0.2  , 0.2  , 0.1  , 0.0  ], 
+        "use_batch_norm": [True, True , False, False, False], 
         "attention": {
             "num_heads": 8,
             "head_dim": 64,

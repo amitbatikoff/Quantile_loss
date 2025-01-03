@@ -260,31 +260,37 @@ def main():
     try:
         model = load_model()
     except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
+        print(f"Error loading model: {str(e)}")
         model_loaded = False
 
     # Create tabs
-    tab1, tab2 = st.tabs(["Predictions", "Training Metrics"])
+    tab1, tab2 = st.tabs([ "Training Metrics","Predictions"])
 
-    # If model failed to load, automatically switch to tab 2
-    if not model_loaded:
-        tab1.error("Predictions tab disabled - Model failed to load")
-        with tab2:
-            st.header("Training Metrics")
-            metrics_df = load_latest_metrics()
+    with tab1:
+        st.header("Training Metrics")
+        
+        # Add refresh button for metrics
+        if st.button('Refresh Training Metrics'):
+            load_latest_metrics.clear()
+            st.success('Metrics refreshed!')
             
-            if metrics_df is not None:
-                fig = plot_training_metrics(metrics_df)
-                if fig:
-                    st.plotly_chart(fig, use_container_width=True)
-                    with st.expander("View Raw Metrics Data"):
-                        st.dataframe(metrics_df)
-            else:
-                st.warning("No training metrics found. Start training to see metrics here.")
-        return
+        metrics_df = load_latest_metrics()
+        
+        if metrics_df is not None:
+            fig = plot_training_metrics(metrics_df)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+                
+                with st.expander("View Raw Metrics Data"):
+                    st.dataframe(metrics_df)
+        else:
+            st.warning("No training metrics found. Start training to see metrics here.")
 
     # Rest of the code only executes if model loaded successfully
-    with tab1:
+    with tab2:
+        if not model_loaded:
+            tab1.error("Predictions tab disabled - Model failed to load")
+            return
         test_data = load_stock_data()
         performances = calculate_stock_performance(model, test_data)
         top_15_predictions = performances[:15]
@@ -372,25 +378,6 @@ def main():
                 st.error(f"Failed to load test data for {selected_stock}")
                 return
 
-    with tab2:
-        st.header("Training Metrics")
-        
-        # Add refresh button for metrics
-        if st.button('Refresh Training Metrics'):
-            load_latest_metrics.clear()
-            st.success('Metrics refreshed!')
-            
-        metrics_df = load_latest_metrics()
-        
-        if metrics_df is not None:
-            fig = plot_training_metrics(metrics_df)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True)
-                
-                with st.expander("View Raw Metrics Data"):
-                    st.dataframe(metrics_df)
-        else:
-            st.warning("No training metrics found. Start training to see metrics here.")
 
 if __name__ == '__main__':
     main()
