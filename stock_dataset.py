@@ -58,11 +58,13 @@ class StockDataset(Dataset):
         # Convert to tensors
         if self.mode == 'train':
             # For training, use price differences
-            input_tensor = torch.FloatTensor(self._calculate_diffs(input_values))
+            diffs = self._calculate_diffs(input_values)
+            normalized_diffs = (11*(diffs - diffs.min()) / (diffs.max() - diffs.min())).astype(np.uint8)
+            input_tensor = torch.tensor(normalized_diffs, dtype=torch.uint8)
         else:
             # For visualization, use raw prices
             input_tensor = torch.FloatTensor(input_values)
-            
+
         target_value = (day_data['close'].iloc[target_split:] - day_data['close'].iloc[input_split-1]).max()            
         target_tensor = torch.FloatTensor([target_value])
         
