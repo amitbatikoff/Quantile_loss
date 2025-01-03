@@ -141,18 +141,17 @@ class StockPredictor(pl.LightningModule):
     def configure_optimizers(self):
         lr = MODEL_PARAMS['learning_rate']
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        # scheduler_config = {
-        #     "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-        #         optimizer,
-        #         mode='min',
-        #         factor=0.05,
-        #         patience=10,
-        #         threshold=0.1,
-        #         min_lr=1e-7,
-        #         threshold_mode = 'abs'
-        #     ),
-        #     "monitor": "val_loss",
-        #     "interval": "epoch",
-        #     "frequency": 1,
-        # }
-        return {"optimizer": optimizer}#, "lr_scheduler": scheduler_config}
+        scheduler_config = {
+            "scheduler": torch.optim.lr_scheduler.CyclicLR(
+                optimizer,
+                base_lr=lr/1000,  # lower learning rate
+                max_lr=lr,      # upper learning rate
+                step_size_up=200,  # steps per half cycle
+                mode='exp_range',  # exponential scaling
+                gamma=0.99994,    # decay factor
+                cycle_momentum=False  # don't cycle momentum
+            ),
+            "interval": "step",  # update lr every step
+            "frequency": 1,
+        }
+        return {"optimizer": optimizer, "lr_scheduler": scheduler_config}
