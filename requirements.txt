@@ -7,3 +7,4 @@ matplotlib
 dash-bootstrap-components 
 plotly
 streamlit
+debugpy

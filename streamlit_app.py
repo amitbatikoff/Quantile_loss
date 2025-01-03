@@ -21,7 +21,6 @@ def load_model(_trigger=False):
         # First try to get input size from saved model
         state_dict = torch.load('unified_stock_model.pt', map_location=torch.device('cpu'))
         input_size = state_dict['model.1.weight'].shape[1]  # Get input size from first layer
-        st.info(f"Detected model input size: {input_size}")
         
         # Initialize model with detected input size
         model = StockPredictor(input_size=int(input_size))  # Ensure input_size is int
