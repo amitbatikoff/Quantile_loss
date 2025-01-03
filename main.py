@@ -55,7 +55,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=50,
+        patience=150,
         mode='min'
     )
 

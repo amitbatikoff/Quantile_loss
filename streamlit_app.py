@@ -11,6 +11,8 @@ from stock_dataset import StockDataset
 import plotly.express as px
 import os
 import glob
+import debugpy
+
 
 @st.cache_resource
 def load_model(_trigger=False):
@@ -19,20 +21,25 @@ def load_model(_trigger=False):
         # First try to get input size from saved model
         state_dict = torch.load('unified_stock_model.pt', map_location=torch.device('cpu'))
         input_size = state_dict['model.1.weight'].shape[1]  # Get input size from first layer
-    except Exception as e:
-        st.error(f"Error detecting input size: {str(e)}")
-        input_size = MODEL_PARAMS['architecture']['default_input_size']
-        st.warning(f"Using fallback input size: {input_size}")
-
-    try:
-        model = StockPredictor(input_size=input_size)
+        st.info(f"Detected model input size: {input_size}")
+        
+        # Initialize model with detected input size
+        model = StockPredictor(input_size=int(input_size))  # Ensure input_size is int
         model.load_state_dict(state_dict)
         model.eval()
+        
+        # Verify initialization
+        if not hasattr(model, '_input_size'):
+            raise AttributeError("Model initialization failed: _input_size not set")
+        
         return model
+        
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
-        st.info("Initializing new model with current architecture...")
-        model = StockPredictor(input_size=input_size)
+        # Use default input size from config
+        default_size = 24  # Set a reasonable default
+        st.warning(f"Using fallback input size: {default_size}")
+        model = StockPredictor(input_size=default_size)
         model.eval()
         return model
 
@@ -43,9 +50,18 @@ def load_stock_data():
     return test_data
 
 def prepare_input_data(dataset, index):
-    input_data, actual_price = dataset[index]
-    actual_price += input_data[-1].item()
-    return input_data.numpy(), actual_price.item(), dataset.data
+    try:
+        input_data, actual_price = dataset[index]
+        if not isinstance(input_data, torch.Tensor):
+            input_data = torch.tensor(input_data)
+        if not isinstance(actual_price, torch.Tensor):
+            actual_price = torch.tensor(actual_price)
+        
+        actual_price += input_data[-1].item()
+        return input_data.numpy(), actual_price.item(), dataset.data
+    except Exception as e:
+        st.error(f"Error preparing input data: {str(e)}")
+        return None, None, None
 
 def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date):
     fig = go.Figure()
@@ -115,43 +131,63 @@ def create_prediction_plot(day_data, input_data, actual_price, predictions, sele
     
     return fig
 
-def calculate_stock_performance(model, test_data):
+@st.cache_data
+def calculate_stock_performance(_model, test_data):
+    if not hasattr(_model, '_input_size'):
+        st.error("Invalid model: missing input_size attribute")
+        return []
+        
     performances = []
     
     for symbol in SYMBOLS:
         if symbol in test_data:
-            # Use 'train' mode for prediction dataset
-            pred_dataset = StockDataset({symbol: test_data[symbol]}, mode='train')
-            # Use 'viz' mode for visualization dataset
-            viz_dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
-            
-            if len(viz_dataset) > 0:
-                for idx, (date, sym) in enumerate(viz_dataset.date_symbols):
-                    if sym == symbol:
-                        try:
-                            # Get visualization data for reference
-                            input_values, actual_price, _ = prepare_input_data(viz_dataset, idx)
-                            
-                            # Find corresponding index in prediction dataset
-                            pred_idx = pred_dataset.find_date_index(date)
-                            if pred_idx is None:
-                                continue
+            try:
+                # Use 'train' mode for prediction dataset
+                pred_dataset = StockDataset({symbol: test_data[symbol]}, mode='train')
+                # Validate input dimensions
+                sample_input, _ = pred_dataset[0]
+                if sample_input.shape[0] != _model._input_size:  # Access protected attribute
+                    continue
+                
+                # Use 'viz' mode for visualization dataset
+                viz_dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
+                
+                if len(viz_dataset) > 0:
+                    for idx, (date, sym) in enumerate(viz_dataset.date_symbols):
+                        if sym == symbol:
+                            try:
+                                # Get visualization data for reference
+                                input_data = prepare_input_data(viz_dataset, idx)
+                                if input_data[0] is None:
+                                    continue
+                                if  input_data[0].shape[0] != _model._input_size:
+                                    continue
                                 
-                            # Get prediction using 'train' mode data
-                            pred_input, _ = pred_dataset[pred_idx]
-                            
-                            with torch.no_grad():
-                                input_tensor = pred_input.unsqueeze(0)
-                                predictions = model(input_tensor)
-                                predictions = predictions.squeeze().numpy() + input_values[-1]
-                            
-                            last_price = float(input_values[-1])
-                            min_prediction = float(np.min(predictions))
-                            performance = (min_prediction - last_price)/max(0.1, last_price)
-                            performances.append((symbol, date, performance, last_price))
-                        except Exception as e:
-                            print(f"Error calculating performance for {symbol} on {date}: {str(e)}")
-                            continue
+                                input_values, actual_price,_ = input_data
+
+                                # Find corresponding index in prediction dataset
+                                pred_idx = pred_dataset.find_date_index(date)
+                                if pred_idx is None:
+                                    continue
+                                    
+                                # Get prediction using 'train' mode data
+                                pred_input, _ = pred_dataset[pred_idx]
+                                
+                                with torch.no_grad():
+                                    input_tensor = pred_input.unsqueeze(0)
+                                    predictions = _model(input_tensor)
+                                    predictions = predictions.squeeze().numpy() + input_values[-1]
+                                
+                                last_price = float(input_values[-1])
+                                min_prediction = float(np.min(predictions))
+                                performance = (min_prediction - last_price)/max(0.1, last_price)
+                                performances.append((symbol, date, performance, last_price))
+                            except Exception as e:
+                                st.warning(f"Error processing {symbol} on {date}: {str(e)}")
+                                continue
+            except Exception as e:
+                st.error(f"Error processing symbol {symbol}: {str(e)}")
+                continue
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
 
@@ -183,9 +219,10 @@ def plot_training_metrics(metrics_df):
     
     # Plot training loss with explicit visibility
     if 'train_loss' in metrics_df.columns:
+        filtered_df = metrics_df[metrics_df['train_loss'].notna()]
         fig.add_trace(go.Scatter(
-            x=metrics_df['step'],
-            y=metrics_df['train_loss'],
+            x=filtered_df['step'],
+            y=filtered_df['train_loss'],
             name='Training Loss',
             mode='lines',
             line=dict(color='blue', width=2),
@@ -194,9 +231,10 @@ def plot_training_metrics(metrics_df):
     
     # Plot validation loss with explicit visibility
     if 'val_loss' in metrics_df.columns:
+        filtered_df = metrics_df[metrics_df['val_loss'].notna()]
         fig.add_trace(go.Scatter(
-            x=metrics_df['step'],
-            y=metrics_df['val_loss'],
+            x=filtered_df['step'],
+            y=filtered_df['val_loss'],
             name='Validation Loss',
             mode='lines',
             line=dict(color='red', width=2),
@@ -214,7 +252,6 @@ def plot_training_metrics(metrics_df):
     return fig
 
 def main():
-    st.title('Stock Price Prediction Visualization')
     
     # Sidebar controls
     st.sidebar.header('Select Parameters')
@@ -225,36 +262,42 @@ def main():
         load_model.clear()
         st.sidebar.success('Model reloaded!')
     
+    if st.sidebar.button('Attach debugger'):
+        debugpy.listen(("localhost", 5678))
+        print("Waiting for debugger to attach...")
+        debugpy.wait_for_client()
+        st.title('Stock Price Prediction Visualization')
+
     # Load model with current trigger value
     model = load_model()
     
     # Use cached stock data
     test_data = load_stock_data()
-    
-    performances = calculate_stock_performance(model, test_data)
-    top_15_predictions = performances[:15]
-    
-    # Updated formatting to handle the values more safely
-    stock_options = []
-    for symbol, date, perf, last_price in top_15_predictions:
-        label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf*100:.2f}%)"
-        stock_options.append((label, (symbol, date)))
-    
-    if not stock_options:
-        st.error("No stocks available for prediction")
-        return
-        
-    selected_option = st.sidebar.radio(
-        "Select from top 15 performing predictions",
-        options=stock_options,
-        format_func=lambda x: x[0]
-    )
-    selected_stock, selected_date = selected_option[1]
-    
-    # Create tabs
+
+        # Create tabs
     tab1, tab2 = st.tabs(["Predictions", "Training Metrics"])
-    
+
     with tab1:
+        performances = calculate_stock_performance(model, test_data)
+        top_15_predictions = performances[:15]
+        
+        # Updated formatting to handle the values more safely
+        stock_options = []
+        for symbol, date, perf, last_price in top_15_predictions:
+            label = f"{symbol} on {date.strftime('%Y-%m-%d')} (P10 chnage: {perf*100:.2f}%)"
+            stock_options.append((label, (symbol, date)))
+        
+        if not stock_options:
+            st.error("No stocks available for prediction")
+            return
+            
+        selected_option = st.sidebar.radio(
+            "Select from top 15 performing predictions",
+            options=stock_options,
+            format_func=lambda x: x[0]
+        )
+        selected_stock, selected_date = selected_option[1]
+    
         # Modified the rest of the main function to use the selected date directly
         if selected_stock in test_data:
             test_df = test_data[selected_stock]
@@ -323,6 +366,12 @@ def main():
 
     with tab2:
         st.header("Training Metrics")
+        
+        # Add refresh button for metrics
+        if st.button('Refresh Training Metrics'):
+            load_latest_metrics.clear()
+            st.success('Metrics refreshed!')
+            
         metrics_df = load_latest_metrics()
         
         if metrics_df is not None:

@@ -63,6 +63,8 @@ class MultiHeadAttention(nn.Module):
 class StockPredictor(pl.LightningModule):
     def __init__(self, input_size, total_steps=1000):
         super(StockPredictor, self).__init__()
+        self._input_size = input_size  # Store input size as protected attribute
+        print(input_size)
         self.save_hyperparameters()
         self.total_steps = total_steps
         self.quantiles = MODEL_PARAMS['quantiles']
@@ -111,6 +113,11 @@ class StockPredictor(pl.LightningModule):
         
         self.model = nn.Sequential(*layers)
         self.loss_fn = QuantileLoss(self.quantiles)
+
+    @property
+    def input_size(self):
+        """Get the model's input size"""
+        return self._input_size
 
     def forward(self, x):
         return self.model(x)
