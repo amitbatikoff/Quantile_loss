@@ -70,3 +70,10 @@ class StockDataset(Dataset):
         target_tensor = torch.FloatTensor([target_value])
         
         return input_tensor, target_tensor
+
+    def find_date_index(self, target_date):
+        """Find the index for a specific date in the dataset"""
+        for idx, (date, _) in enumerate(self.date_symbols):
+            if date == target_date:
+                return idx
+        return None

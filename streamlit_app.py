@@ -9,6 +9,8 @@ import numpy as np
 from torch.utils.data import DataLoader
 from stock_dataset import StockDataset
 import plotly.express as px
+import os
+import glob
 
 @st.cache_resource
 def load_model(_trigger=False):
@@ -118,28 +120,98 @@ def calculate_stock_performance(model, test_data):
     
     for symbol in SYMBOLS:
         if symbol in test_data:
-            dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
-            if len(dataset) > 0:
-                for idx, (date, sym) in enumerate(dataset.date_symbols):
+            # Use 'train' mode for prediction dataset
+            pred_dataset = StockDataset({symbol: test_data[symbol]}, mode='train')
+            # Use 'viz' mode for visualization dataset
+            viz_dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
+            
+            if len(viz_dataset) > 0:
+                for idx, (date, sym) in enumerate(viz_dataset.date_symbols):
                     if sym == symbol:
                         try:
-                            input_values, actual_price, _ = prepare_input_data(dataset, idx)
+                            # Get visualization data for reference
+                            input_values, actual_price, _ = prepare_input_data(viz_dataset, idx)
+                            
+                            # Find corresponding index in prediction dataset
+                            pred_idx = pred_dataset.find_date_index(date)
+                            if pred_idx is None:
+                                continue
+                                
+                            # Get prediction using 'train' mode data
+                            pred_input, _ = pred_dataset[pred_idx]
                             
                             with torch.no_grad():
-                                input_tensor = torch.FloatTensor(input_values).unsqueeze(0)
+                                input_tensor = pred_input.unsqueeze(0)
                                 predictions = model(input_tensor)
                                 predictions = predictions.squeeze().numpy() + input_values[-1]
                             
-                            # Convert numpy values to Python native types
                             last_price = float(input_values[-1])
-                            min_prediction = float(np.min(predictions))  
+                            min_prediction = float(np.min(predictions))
                             performance = (min_prediction - last_price)/max(0.1, last_price)
                             performances.append((symbol, date, performance, last_price))
                         except Exception as e:
                             print(f"Error calculating performance for {symbol} on {date}: {str(e)}")
-                            raise
+                            continue
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
+
+@st.cache_data(ttl=10)  # Cache for 10 seconds to allow for updates
+def load_latest_metrics():
+    try:
+        # Find the latest metrics file in lightning_logs
+        log_dirs = glob.glob("lightning_logs/version_*")
+        if not log_dirs:
+            return None
+        
+        latest_version = max(int(d.split('_')[-1]) for d in log_dirs)
+        metrics_file = f"lightning_logs/version_{latest_version}/metrics.csv"
+        
+        if not os.path.exists(metrics_file):
+            return None
+            
+        df = pd.read_csv(metrics_file)
+        return df
+    except Exception as e:
+        st.error(f"Error loading metrics: {str(e)}")
+        return None
+
+def plot_training_metrics(metrics_df):
+    if metrics_df is None or metrics_df.empty:
+        return None
+        
+    fig = go.Figure()
+    
+    # Plot training loss with explicit visibility
+    if 'train_loss' in metrics_df.columns:
+        fig.add_trace(go.Scatter(
+            x=metrics_df['step'],
+            y=metrics_df['train_loss'],
+            name='Training Loss',
+            mode='lines',
+            line=dict(color='blue', width=2),
+            visible=True
+        ))
+    
+    # Plot validation loss with explicit visibility
+    if 'val_loss' in metrics_df.columns:
+        fig.add_trace(go.Scatter(
+            x=metrics_df['step'],
+            y=metrics_df['val_loss'],
+            name='Validation Loss',
+            mode='lines',
+            line=dict(color='red', width=2),
+            visible=True
+        ))
+    
+    fig.update_layout(
+        title='Training Metrics',
+        xaxis_title='Steps',
+        yaxis_title='Loss',
+        hovermode='x unified',
+        showlegend=True
+    )
+    
+    return fig
 
 def main():
     st.title('Stock Price Prediction Visualization')
@@ -179,67 +251,89 @@ def main():
     )
     selected_stock, selected_date = selected_option[1]
     
-    # Modified the rest of the main function to use the selected date directly
-    if selected_stock in test_data:
-        test_df = test_data[selected_stock]
-        if test_df.empty:
-            st.error(f"No data available for {selected_stock}")
-            return
+    # Create tabs
+    tab1, tab2 = st.tabs(["Predictions", "Training Metrics"])
+    
+    with tab1:
+        # Modified the rest of the main function to use the selected date directly
+        if selected_stock in test_data:
+            test_df = test_data[selected_stock]
+            if test_df.empty:
+                st.error(f"No data available for {selected_stock}")
+                return
+                
+            # Create datasets for both modes
+            pred_dataset = StockDataset({selected_stock: test_df}, mode='train')
+            viz_dataset = StockDataset({selected_stock: test_df}, mode='viz')
             
-        # Create dataset
-        dataset = StockDataset({selected_stock: test_df}, mode='viz')
-        
-        # Use the selected date directly instead of showing date picker
-        if (selected_date, selected_stock) in dataset.date_symbols:
-            # Prepare input data
-            index = dataset.date_symbols.index((selected_date, selected_stock))
-            input_values, actual_price, day_data = prepare_input_data(dataset, index)
-            
-            # Get prediction
-            with torch.no_grad():
-                input_tensor = torch.FloatTensor(input_values).unsqueeze(0)
-                predictions = model(input_tensor)
-                predictions = predictions.squeeze().numpy() + input_values[-1]
-            
-            # Create and display the plot
-            fig = create_prediction_plot(
-                day_data,
-                input_values,
-                actual_price,
-                predictions,
-                selected_date
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Display main metrics
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Last input", f"${input_values[-1]:.2f}")
-            col2.metric("Median (P50)", f"${predictions[4]:.2f}")  # 0.5 quantile
-            col3.metric("Prediction Interval", 
-                        f"${predictions[0]:.2f} - ${predictions[-1]:.2f}")  # P10-P90
-
-            # Display main metrics
-            col1, col2 = st.columns(2)
-            col1.metric("P10 change", f"{100*(np.min(predictions)-input_values[-1])/input_values[-1]:.2f}%")
-            col2.metric("P50 change", f"{100*(np.median(predictions)-input_values[-1])/input_values[-1]:.2f}%")
-
-            # Display prediction details in an expandable section
-            with st.expander("View Quantile Predictions"):
-                cols = st.columns(3)
-                for i, quantile in enumerate(MODEL_PARAMS['quantiles']):
-                    col_idx = i % 3
-                    cols[col_idx].metric(
-                        f"P{int(quantile*100)} Prediction", 
-                        f"${predictions[i]:.2f}",
-                        f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
+            if (selected_date, selected_stock) in viz_dataset.date_symbols:
+                # Get visualization data
+                viz_idx = viz_dataset.date_symbols.index((selected_date, selected_stock))
+                input_values, actual_price, day_data = prepare_input_data(viz_dataset, viz_idx)
+                
+                # Get prediction data
+                pred_idx = pred_dataset.find_date_index(selected_date)
+                if pred_idx is not None:
+                    pred_input, _ = pred_dataset[pred_idx]
+                    
+                    # Get prediction using train mode data
+                    with torch.no_grad():
+                        input_tensor = pred_input.unsqueeze(0)
+                        predictions = model(input_tensor)
+                        predictions = predictions.squeeze().numpy() + input_values[-1]
+                    
+                    # Create and display the plot
+                    fig = create_prediction_plot(
+                        day_data,
+                        input_values,
+                        actual_price,
+                        predictions,
+                        selected_date
                     )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Display main metrics
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Last input", f"${input_values[-1]:.2f}")
+                    col2.metric("Median (P50)", f"${predictions[4]:.2f}")  # 0.5 quantile
+                    col3.metric("Prediction Interval", 
+                                f"${predictions[0]:.2f} - ${predictions[-1]:.2f}")  # P10-P90
 
+                    # Display main metrics
+                    col1, col2 = st.columns(2)
+                    col1.metric("P10 change", f"{100*(np.min(predictions)-input_values[-1])/input_values[-1]:.2f}%")
+                    col2.metric("P50 change", f"{100*(np.median(predictions)-input_values[-1])/input_values[-1]:.2f}%")
+
+                    # Display prediction details in an expandable section
+                    with st.expander("View Quantile Predictions"):
+                        cols = st.columns(3)
+                        for i, quantile in enumerate(MODEL_PARAMS['quantiles']):
+                            col_idx = i % 3
+                            cols[col_idx].metric(
+                                f"P{int(quantile*100)} Prediction", 
+                                f"${predictions[i]:.2f}",
+                                f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
+                            )
+
+                else:
+                    st.warning('No data available for the selected date.')
+            else:
+                st.error(f"Failed to load test data for {selected_stock}")
+                return
+
+    with tab2:
+        st.header("Training Metrics")
+        metrics_df = load_latest_metrics()
+        
+        if metrics_df is not None:
+            fig = plot_training_metrics(metrics_df)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+                
+                with st.expander("View Raw Metrics Data"):
+                    st.dataframe(metrics_df)
         else:
-            st.warning('No data available for the selected date.')
-    else:
-        st.error(f"Failed to load test data for {selected_stock}")
-        return
-
+            st.warning("No training metrics found. Start training to see metrics here.")
 
 if __name__ == '__main__':
     main()
