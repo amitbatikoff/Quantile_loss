@@ -44,8 +44,8 @@ class StockPredictor(pl.LightningModule):
                 nn.ReLU(),
             ])
             # Add dropout after first two layers
-            if i < 2:
-                layers.append(nn.Dropout(p=0.1))
+            if i < 4:
+                layers.append(nn.Dropout(p=0.2))
             prev_size = hidden_size
         
         # Output layer
@@ -76,18 +76,18 @@ class StockPredictor(pl.LightningModule):
     def configure_optimizers(self):
         lr = MODEL_PARAMS['learning_rate']
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        scheduler_config = {
-            "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                mode='min',
-                factor=0.05,
-                patience=10,
-                threshold=0.3,
-                min_lr=1e-6,
-                threshold_mode = 'abs'
-            ),
-            "monitor": "val_loss",
-            "interval": "epoch",
-            "frequency": 1,
-        }
-        return {"optimizer": optimizer, "lr_scheduler": scheduler_config}
+        # scheduler_config = {
+        #     "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
+        #         optimizer,
+        #         mode='min',
+        #         factor=0.05,
+        #         patience=10,
+        #         threshold=0.1,
+        #         min_lr=1e-7,
+        #         threshold_mode = 'abs'
+        #     ),
+        #     "monitor": "val_loss",
+        #     "interval": "epoch",
+        #     "frequency": 1,
+        # }
+        return {"optimizer": optimizer}#, "lr_scheduler": scheduler_config}

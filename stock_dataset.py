@@ -5,7 +5,13 @@ import numpy as np
 from config import MODEL_PARAMS
 
 class StockDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, mode='train'):
+        """
+        Args:
+            data: Dictionary of stock data
+            mode: 'train' for training (returns diffs) or 'viz' for visualization (returns raw prices)
+        """
+        self.mode = mode
         self.data = {}
         self.date_symbols = []
         
@@ -28,6 +34,10 @@ class StockDataset(Dataset):
                 except Exception as e:
                     raise ValueError(f"Error processing timestamps for {symbol}: {str(e)}")
 
+    def _calculate_diffs(self, prices):
+        """Calculate price differences."""
+        return np.diff(prices, prepend=prices[0])
+
     def __len__(self):
         return len(self.date_symbols)
 
@@ -44,10 +54,16 @@ class StockDataset(Dataset):
         
         # Get input values and target
         input_values = day_data['close'].iloc[:input_split].values
-        target_value = (day_data['close'].iloc[target_split:] - day_data['close'].iloc[input_split-1]).max()
         
-        # Convert to tensors and ensure correct shape
-        input_tensor = torch.FloatTensor(input_values)
+        # Convert to tensors
+        if self.mode == 'train':
+            # For training, use price differences
+            input_tensor = torch.FloatTensor(self._calculate_diffs(input_values))
+        else:
+            # For visualization, use raw prices
+            input_tensor = torch.FloatTensor(input_values)
+            
+        target_value = (day_data['close'].iloc[target_split:] - day_data['close'].iloc[input_split-1]).max()            
         target_tensor = torch.FloatTensor([target_value])
         
         return input_tensor, target_tensor

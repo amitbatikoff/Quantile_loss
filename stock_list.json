@@ -4,7 +4,7 @@
         "ADI", "ADM", "ADP", "ADSK", "AEE", "AEP", "AES", "AFL", "AGR", "AIG",
         "AKAM", "ALB", "ALGN", "ALK", "ALL", "ALLE", "AMAT", "AMCR", "AMD", "AME",
         "AMGN", "AMP", "AMT", "AMZN", "ANET", "ANSS", "AON", "AOS", "APA",
-        "APD", "APH", "APTV", "ARE", "ATO", "ATVI", "AVB", "AVGO", "AVY", "AWK",
+        "APD", "APH", "APTV", "ARE", "ATO", "AVB", "AVGO", "AVY", "AWK",
         "AXP", "AZO", "BA", "BAC", "BAX", "BBY", "BDX", "BEN", "BF-B", "BIIB",
         "BIO", "BK", "BKNG", "BKR", "BLK" , "BMY", "BR", "BRK-B", "BSX",
         "BWA", "BXP", "C", "CAG", "CAH", "CARR", "CAT", "CB", "CBOE", "CBRE",
@@ -46,10 +46,19 @@
         "TJX", "TMO", "TMUS", "TPR", "TRMB", "TROW", "TRV", "TSCO", "TSLA", "TSN",
         "TT", "TTWO", "TXN", "TXT", "TYL", "UA", "UAA", "UAL", "UDR", "UHS",
         "ULTA", "UNH", "UNM", "UNP", "UPS", "URI", "USB", "V", "VFC",
-        "VIAC", "VLO", "VMC", "VNO", "VNT", "VRSK", "VRSN", "VRTX", "VTR", "VTRS",
+        "VLO", "VMC", "VNO", "VNT", "VRSK", "VRSN", "VRTX", "VTR", "VTRS",
         "VZ", "WAB", "WAT", "WBA", "WDC", "WEC", "WELL", "WFC", "WHR",
         "WM", "WMB", "WMT", "WRB", "WRK", "WST", "WU", "WY", "WYNN", "XEL",
         "XLNX", "XOM", "XRAY", "XYL", "YUM", "ZBH", "ZBRA", "ZION", "ZTS",
         "OKLO", "RDDT","PLTR","TQQQ"
+    ],
+    "symbols_small": [
+        "A", "AA", "AAL", "AAPL", "ABBV", "ABT", "ACN", "ADBE", 
+        "ADI", "ADM", "ADP", "ADSK", "AEE", "AEP", "AES", "AFL", "AGR", "AIG",
+        "AKAM", "ALB", "ALGN", "ALK", "ALL", "ALLE", "AMAT", "AMCR", "AMD", "AME",
+        "AMGN", "AMP", "AMT", "AMZN", "ANET", "ANSS", "AON", "AOS", "APA",
+        "APD", "APH", "APTV", "ARE", "ATO", "AVB", "AVGO", "AVY", "AWK",
+        "AXP", "AZO", "BA", "BAC", "BAX", "BBY", "BDX", "BEN", "BF-B", "BIIB",
+        "ZBH", "ZBRA", "ZION", "ZTS","OKLO", "RDDT","PLTR","TQQQ"
     ]
 }

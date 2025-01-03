@@ -6,50 +6,43 @@ from stock_dataset import StockDataset
 from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
 from config import SYMBOLS, DATALOADER_PARAMS
-
-def collate_fn(batch):
-    # Pad or truncate sequences to match model's expected input size
-    inputs, targets = zip(*batch)
-    max_len = 195  # Expected input size
-    
-    # Pad or truncate each input sequence
-    processed_inputs = []
-    for seq in inputs:
-        # if len(seq) > max_len:
-        #     processed_inputs.append(seq[-max_len:])  # Take last max_len elements
-        # else:
-        #     # Pad with zeros at the beginning
-        #     padding = torch.zeros(max_len - len(seq))
-        #     processed_inputs.append(torch.cat([padding, seq]))
-        processed_inputs.append(seq) 
-
-    return torch.stack(processed_inputs), torch.stack(targets)
+import time
 
 def main():
-    # Get and process data
+    # Start time measurement
+    start_time = time.time()
     stock_data = get_stock_data(SYMBOLS)
-    train, val, test = split_data(stock_data)
+    train, val, _ = split_data(stock_data)
+    end_time = time.time()
+    print(f"Data loadinf took {end_time - start_time:.2f} seconds")
 
     # Calculate optimal number of workers
     num_workers = min(multiprocessing.cpu_count() - 1, 11)
 
-    # Create dataloaders with workers
-    train_loader = DataLoader(StockDataset(train), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=True, 
-                            num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
-    val_loader = DataLoader(StockDataset(val), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
-                          num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
-    test_loader = DataLoader(StockDataset(test), batch_size=DATALOADER_PARAMS['batch_size'], shuffle=False,
-                           num_workers=num_workers, pin_memory=True, persistent_workers=True, collate_fn=collate_fn)
+    # Use a smaller batch size or ensure dataset is large enough
+    batch_size = DATALOADER_PARAMS['batch_size']
+    
+    start_time = time.time()
+    train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, 
+                            num_workers=num_workers, pin_memory=True, persistent_workers=True)
+    val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False,
+                          num_workers=num_workers, pin_memory=True, persistent_workers=True)
+    end_time = time.time()
+    print(f"Dataset creation took {end_time - start_time:.2f} seconds")
 
-    # Get input size from a sample batch
-    sample_batch = next(iter(train_loader))
-    input_size = sample_batch[0].shape[1]
+    start_time = time.time()
+    # sample_batch = next(iter(train_loader))
+    input_size = 195#sample_batch[0].shape[1]
+    end_time = time.time()
+    print(f"sample_batch {end_time - start_time:.2f} seconds, input_size: {input_size}")
 
     # Calculate total steps for the scheduler
     total_steps = len(train_loader) * 1000  # 1000 is max_epochs
 
-    # Initialize model with total_steps
+    start_time = time.time()
     model = StockPredictor(input_size=input_size, total_steps=total_steps)
+    end_time = time.time()
+    print(f"model setting took {end_time - start_time:.2f} seconds")
 
     # Setup callbacks
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
@@ -71,7 +64,7 @@ def main():
 
     # Initialize trainer with scheduler
     trainer = pl.Trainer(
-        max_epochs=2000,
+        max_epochs=500,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,

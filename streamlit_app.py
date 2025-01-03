@@ -118,7 +118,7 @@ def calculate_stock_performance(model, test_data):
     
     for symbol in SYMBOLS:
         if symbol in test_data:
-            dataset = StockDataset({symbol: test_data[symbol]})
+            dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
             if len(dataset) > 0:
                 for idx, (date, sym) in enumerate(dataset.date_symbols):
                     if sym == symbol:
@@ -161,7 +161,6 @@ def main():
     
     performances = calculate_stock_performance(model, test_data)
     top_15_predictions = performances[:15]
-    print(top_15_predictions)
     
     # Updated formatting to handle the values more safely
     stock_options = []
@@ -174,7 +173,7 @@ def main():
         return
         
     selected_option = st.sidebar.radio(
-        "Select from top 10 performing predictions",
+        "Select from top 15 performing predictions",
         options=stock_options,
         format_func=lambda x: x[0]
     )
@@ -188,7 +187,7 @@ def main():
             return
             
         # Create dataset
-        dataset = StockDataset({selected_stock: test_df})
+        dataset = StockDataset({selected_stock: test_df}, mode='viz')
         
         # Use the selected date directly instead of showing date picker
         if (selected_date, selected_stock) in dataset.date_symbols:
