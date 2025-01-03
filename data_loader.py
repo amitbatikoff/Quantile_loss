@@ -62,12 +62,16 @@ def get_stock_data(symbols):
         # Download current data
         current_df = download_stock_data(symbol)
         
-        # Download June 2024 data
-        future_df = download_stock_data(symbol, month="2024-06")
+        # Download data for the months April 2024 to June 2024
+        future_dfs = []
+        for month in ["2022-12", "2023-12", "2024-06"]:
+            future_df = download_stock_data(symbol, month=month)
+            if future_df is not None:
+                future_dfs.append(future_df)
         
-        # Combine the dataframes if both are available
-        if current_df is not None and future_df is not None:
-            df = pd.concat([current_df, future_df], ignore_index=True)
+        # Combine the dataframes if both current and future data are available
+        if current_df is not None and future_dfs:
+            df = pd.concat([current_df] + future_dfs, ignore_index=True)
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
             stock_data[symbol] = df
             all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
