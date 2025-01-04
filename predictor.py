@@ -109,7 +109,7 @@ class StockPredictor(pl.LightningModule):
         attn_config = MODEL_PARAMS['architecture']['attention']
         layers.append(
             MultiHeadAttention(
-                input_dim=input_size,
+                input_dim=prev_size,
                 num_heads=attn_config['num_heads'],
                 head_dim=attn_config['head_dim'],
                 dropout=attn_config['attention_dropout']

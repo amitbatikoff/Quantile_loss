@@ -14,7 +14,7 @@ def main():
     stock_data = get_stock_data(SYMBOLS)
     train, val, _ = split_data(stock_data)
     end_time = time.time()
-    print(f"Data loading took {end_time - start_time:.2f} seconds")
+    print(f"Data loadinf took {end_time - start_time:.2f} seconds")
 
     # Calculate optimal number of workers
     num_workers = min(multiprocessing.cpu_count() - 1, 11)

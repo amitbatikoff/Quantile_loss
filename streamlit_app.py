@@ -181,29 +181,16 @@ def calculate_stock_performance(_model, test_data):
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
 
-@st.cache_data
-def get_available_versions():
+@st.cache_data(ttl=10)  # Cache for 10 seconds to allow for updates
+def load_latest_metrics():
     try:
+        # Find the latest metrics file in lightning_logs
         log_dirs = glob.glob("lightning_logs/version_*")
         if not log_dirs:
-            return []
-        versions = [int(d.split('_')[-1]) for d in log_dirs]
-        return sorted(versions, reverse=True)  # newest first
-    except Exception as e:
-        st.error(f"Error getting versions: {str(e)}")
-        return []
-
-@st.cache_data(ttl=10)  # Cache for 10 seconds to allow for updates
-def load_latest_metrics(version=None):
-    try:
-        if version is None:
-            # Find the latest version
-            versions = get_available_versions.clear()
-            if not versions:
-                return None
-            version = versions[0]
-            
-        metrics_file = f"lightning_logs/version_{version}/metrics.csv"
+            return None
+        
+        latest_version = max(int(d.split('_')[-1]) for d in log_dirs)
+        metrics_file = f"lightning_logs/version_{latest_version}/metrics.csv"
         
         if not os.path.exists(metrics_file):
             return None
