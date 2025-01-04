@@ -64,7 +64,7 @@ def main():
 
     # Initialize trainer with scheduler
     trainer = pl.Trainer(
-        max_epochs=20000,
+        max_epochs=500,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,

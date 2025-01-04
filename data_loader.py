@@ -64,7 +64,7 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        for month in ["2022-12", "2023-12", "2024-06"]:
+        for month in ["2022-11","2022-12","2023-09","2023-10", "2023-11", "2023-12", "2024-06", "2024-07"]:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
                 future_dfs.append(future_df)

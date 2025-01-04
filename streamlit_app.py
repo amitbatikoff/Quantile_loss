@@ -181,16 +181,29 @@ def calculate_stock_performance(_model, test_data):
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
 
-@st.cache_data(ttl=10)  # Cache for 10 seconds to allow for updates
-def load_latest_metrics():
+@st.cache_data
+def get_available_versions():
     try:
-        # Find the latest metrics file in lightning_logs
         log_dirs = glob.glob("lightning_logs/version_*")
         if not log_dirs:
-            return None
-        
-        latest_version = max(int(d.split('_')[-1]) for d in log_dirs)
-        metrics_file = f"lightning_logs/version_{latest_version}/metrics.csv"
+            return []
+        versions = [int(d.split('_')[-1]) for d in log_dirs]
+        return sorted(versions, reverse=True)  # newest first
+    except Exception as e:
+        st.error(f"Error getting versions: {str(e)}")
+        return []
+
+@st.cache_data(ttl=10)  # Cache for 10 seconds to allow for updates
+def load_latest_metrics(version=None):
+    try:
+        if version is None:
+            # Find the latest version
+            versions = get_available_versions.clear()
+            if not versions:
+                return None
+            version = versions[0]
+            
+        metrics_file = f"lightning_logs/version_{version}/metrics.csv"
         
         if not os.path.exists(metrics_file):
             return None
@@ -269,12 +282,25 @@ def main():
     with tab1:
         st.header("Training Metrics")
         
+        # Add version selector
+        versions = get_available_versions()
+        if versions:
+            selected_version = st.selectbox(
+                "Select version",
+                versions,
+                format_func=lambda x: f"Version {x}"
+            )
+        else:
+            st.warning("No training versions found")
+            return
+            
         # Add refresh button for metrics
         if st.button('Refresh Training Metrics'):
             load_latest_metrics.clear()
+            get_available_versions.clear()
             st.success('Metrics refreshed!')
             
-        metrics_df = load_latest_metrics()
+        metrics_df = load_latest_metrics(selected_version)
         
         if metrics_df is not None:
             fig = plot_training_metrics(metrics_df)
