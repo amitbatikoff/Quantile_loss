@@ -116,10 +116,9 @@ class StockPredictor(pl.LightningModule):
             )
         )
         
-        layers.append(nn.Flatten(start_dim=1))  # Flatten after attention, starting from dimension 1
+        layers.append(nn.Flatten())  # Flatten after attention
         
         # Hidden layers
-        prev_size = input_size  # Keep track of size after flattening
         arch_config = MODEL_PARAMS['architecture']
         for i, hidden_size in enumerate(arch_config['hidden_sizes']):
             layers.append(nn.Linear(prev_size, hidden_size))
