@@ -60,7 +60,7 @@ class StockDataset(Dataset):
             if (max_diff - min_diff) == 0:
                 normalized_diffs = np.zeros_like(diffs)
             else:
-                normalized_diffs = (11*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
+                normalized_diffs = (5*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
             input_tensor = torch.from_numpy(normalized_diffs).float()
         else:
             # For visualization, use raw prices
