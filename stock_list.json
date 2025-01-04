@@ -54,11 +54,8 @@
     ],
     "symbols_small": [
         "A", "AA", "AAL", "AAPL", "ABBV", "ABT", "ACN", "ADBE", 
-        "ADI", "ADM", "ADP", "ADSK", "AEE", "AEP", "AES", "AFL", "AGR", "AIG",
         "AKAM", "ALB", "ALGN", "ALK", "ALL", "ALLE", "AMAT", "AMCR", "AMD", "AME",
         "AMGN", "AMP", "AMT", "AMZN", "ANET", "ANSS", "AON", "AOS", "APA",
-        "APD", "APH", "APTV", "ARE", "ATO", "AVB", "AVGO", "AVY", "AWK",
-        "AXP", "AZO", "BA", "BAC", "BAX", "BBY", "BDX", "BEN", "BF-B", "BIIB",
         "ZBH", "ZBRA", "ZION", "ZTS","OKLO", "RDDT","PLTR","TQQQ"
     ]
 }

@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from config import MODEL_PARAMS
 import matplotlib.pyplot as plt
+import math
 
 class QuantileLoss(nn.Module):
     def __init__(self, quantiles):
@@ -60,6 +61,27 @@ class MultiHeadAttention(nn.Module):
         attn_output = attn_output.view(batch_size, seq_len, self.num_heads * self.head_dim)
         return self.out_proj(attn_output)
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=1000):
+        super().__init__()
+        position = torch.arange(max_len).unsqueeze(1)
+        pe = torch.zeros(max_len, d_model)
+        
+        # Handle dimensions properly regardless of odd/even
+        d_pairs = (d_model + 1) // 2  # Ceiling division to handle odd dimensions
+        div_term = torch.exp(torch.arange(0, d_pairs) * (-math.log(10000.0) / d_model))
+        position_enc = position * div_term
+        
+        # First fill all even indices
+        pe[:, 0::2] = torch.sin(position_enc[:, :d_model//2 + d_model%2])
+        # Then fill all odd indices (up to available dimensions)
+        pe[:, 1::2] = torch.cos(position_enc[:, :d_model//2])
+        
+        self.register_buffer('pe', pe.unsqueeze(0))
+
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1)]
+
 class StockPredictor(pl.LightningModule):
     def __init__(self, input_size, total_steps=1000):
         super(StockPredictor, self).__init__()
@@ -79,6 +101,9 @@ class StockPredictor(pl.LightningModule):
             nn.Linear(prev_size, prev_size),
             nn.Unflatten(1, (1, prev_size))  # Reshape for attention: [batch, 1, features]
         ])
+        
+        # Add positional encoding
+        layers.append(PositionalEncoding(d_model=prev_size))
         
         # Add attention layer
         attn_config = MODEL_PARAMS['architecture']['attention']
