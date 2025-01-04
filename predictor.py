@@ -64,19 +64,25 @@ class MultiHeadAttention(nn.Module):
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):
         super().__init__()
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, d_model)
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = torch.zeros(1, max_len, d_model)  # Add batch dimension
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        
+        d_model_half = (d_model + 1) // 2
+        div_term = torch.exp(
+            torch.arange(0, d_model_half, dtype=torch.float) * (-math.log(10000.0) / d_model)
+        )
+        
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        if d_model % 2 == 0:
+            pe[0, :, 1::2] = torch.cos(position * div_term)
+        else:
+            pe[0, :, 1::2] = torch.cos(position * div_term[:-1])
+        
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        """
-        Args:
-            x: Tensor, shape [batch_size, seq_len, embedding_dim]
-        """
-        return x + self.pe[:x.size(1)]
+        # x shape: [batch_size, seq_len, features]
+        return x + self.pe[:, :x.size(1)]
 
 class StockPredictor(pl.LightningModule):
     def __init__(self, input_size, total_steps=1000):
@@ -90,29 +96,25 @@ class StockPredictor(pl.LightningModule):
         # Build model dynamically based on config
         layers = []
         
-        # Input layer with positional encoding
-        prev_size = input_size
-        layers.extend([
-            nn.Flatten(),
-            nn.Linear(prev_size, prev_size),
-            nn.Unflatten(1, (1, prev_size)),  # Reshape for attention: [batch, 1, features]
-            PositionalEncoding(prev_size)
-        ])
+        # Reshape input for attention: [batch, seq_len=1, features]
+        layers.append(nn.Unflatten(1, (1, input_size)))
+        layers.append(PositionalEncoding(input_size))
         
         # Add attention layer
         attn_config = MODEL_PARAMS['architecture']['attention']
         layers.append(
             MultiHeadAttention(
-                input_dim=prev_size,
+                input_dim=input_size,
                 num_heads=attn_config['num_heads'],
                 head_dim=attn_config['head_dim'],
                 dropout=attn_config['attention_dropout']
             )
         )
         
-        layers.append(nn.Flatten())  # Flatten after attention
+        layers.append(nn.Flatten(start_dim=1))  # Flatten after attention, starting from dimension 1
         
         # Hidden layers
+        prev_size = input_size  # Keep track of size after flattening
         arch_config = MODEL_PARAMS['architecture']
         for i, hidden_size in enumerate(arch_config['hidden_sizes']):
             layers.append(nn.Linear(prev_size, hidden_size))

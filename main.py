@@ -31,8 +31,8 @@ def main():
     print(f"Dataset creation took {end_time - start_time:.2f} seconds")
 
     start_time = time.time()
-    # sample_batch = next(iter(train_loader))
-    input_size = 195#sample_batch[0].shape[1]
+    sample_batch = next(iter(train_loader))
+    input_size = sample_batch[0].shape[1]
     end_time = time.time()
     print(f"sample_batch {end_time - start_time:.2f} seconds, input_size: {input_size}")
 

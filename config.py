@@ -6,7 +6,7 @@ BASE_URL = "https://www.alphavantage.co/query"
 
 # Load symbols from JSON file
 with open(os.path.join(os.path.dirname(__file__), 'stock_list.json'), 'r') as f:
-    SYMBOLS = json.load(f)['symbols']
+    SYMBOLS = json.load(f)['symbols_small']
 
 MODEL_PARAMS = {
     "learning_rate": 1e-3,
