@@ -214,6 +214,30 @@ def load_latest_metrics(version=None):
         st.error(f"Error loading metrics: {str(e)}")
         return None
 
+@st.cache_data(ttl=10)
+def get_available_versions():
+    try:
+        log_dirs = glob.glob("lightning_logs/version_*")
+        if not log_dirs:
+            return []
+        versions = [int(d.split('_')[-1]) for d in log_dirs]
+        return sorted(versions, reverse=True)  # Latest first
+    except Exception as e:
+        st.error(f"Error loading versions: {str(e)}")
+        return []
+
+@st.cache_data(ttl=10)
+def load_metrics_for_version(version):
+    try:
+        metrics_file = f"lightning_logs/version_{version}/metrics.csv"
+        if not os.path.exists(metrics_file):
+            return None
+        df = pd.read_csv(metrics_file)
+        return df
+    except Exception as e:
+        st.error(f"Error loading metrics for version {version}: {str(e)}")
+        return None
+
 def plot_training_metrics(metrics_df):
     if metrics_df is None or metrics_df.empty:
         return None
@@ -282,33 +306,36 @@ def main():
     with tab1:
         st.header("Training Metrics")
         
-        # Add version selector
-        versions = get_available_versions()
-        if versions:
-            selected_version = st.selectbox(
-                "Select version",
-                versions,
-                format_func=lambda x: f"Version {x}"
-            )
-        else:
-            st.warning("No training versions found")
-            return
-            
-        # Add refresh button for metrics
-        if st.button('Refresh Training Metrics'):
-            load_latest_metrics.clear()
-            get_available_versions.clear()
-            st.success('Metrics refreshed!')
-            
-        metrics_df = load_latest_metrics(selected_version)
-        
-        if metrics_df is not None:
-            fig = plot_training_metrics(metrics_df)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            versions = get_available_versions()
+            if versions:
+                selected_version = st.selectbox(
+                    "Select experiment version",
+                    versions,
+                    format_func=lambda x: f"Version {x}"
+                )
+            else:
+                st.warning("No experiment versions found")
+                selected_version = None
                 
-                with st.expander("View Raw Metrics Data"):
-                    st.dataframe(metrics_df)
+        with col2:
+            if st.button('Refresh Training Metrics'):
+                get_available_versions.clear()
+                load_metrics_for_version.clear()
+                st.success('Metrics refreshed!')
+        
+        if selected_version is not None:
+            metrics_df = load_metrics_for_version(selected_version)
+            if metrics_df is not None:
+                fig = plot_training_metrics(metrics_df)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    with st.expander("View Raw Metrics Data"):
+                        st.dataframe(metrics_df)
+            else:
+                st.warning(f"No metrics found for version {selected_version}")
         else:
             st.warning("No training metrics found. Start training to see metrics here.")
 
@@ -395,7 +422,7 @@ def main():
                             cols[col_idx].metric(
                                 f"P{int(quantile*100)} Prediction", 
                                 f"${predictions[i]:.2f}",
-                                f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
+                                f"{((predictions[i] - actual_price) / actual_price * 100)::.1f}%"
                             )
 
                 else:

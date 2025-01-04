@@ -62,26 +62,24 @@ class MultiHeadAttention(nn.Module):
         return self.out_proj(attn_output)
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
+    def __init__(self, d_model, max_len=1000):
         super().__init__()
-        pe = torch.zeros(1, max_len, d_model)  # Add batch dimension
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        position = torch.arange(max_len).unsqueeze(1)
+        pe = torch.zeros(max_len, d_model)
         
-        d_model_half = (d_model + 1) // 2
-        div_term = torch.exp(
-            torch.arange(0, d_model_half, dtype=torch.float) * (-math.log(10000.0) / d_model)
-        )
+        # Handle dimensions properly regardless of odd/even
+        d_pairs = (d_model + 1) // 2  # Ceiling division to handle odd dimensions
+        div_term = torch.exp(torch.arange(0, d_pairs) * (-math.log(10000.0) / d_model))
+        position_enc = position * div_term
         
-        pe[0, :, 0::2] = torch.sin(position * div_term)
-        if d_model % 2 == 0:
-            pe[0, :, 1::2] = torch.cos(position * div_term)
-        else:
-            pe[0, :, 1::2] = torch.cos(position * div_term[:-1])
+        # First fill all even indices
+        pe[:, 0::2] = torch.sin(position_enc[:, :d_model//2 + d_model%2])
+        # Then fill all odd indices (up to available dimensions)
+        pe[:, 1::2] = torch.cos(position_enc[:, :d_model//2])
         
-        self.register_buffer('pe', pe)
+        self.register_buffer('pe', pe.unsqueeze(0))
 
     def forward(self, x):
-        # x shape: [batch_size, seq_len, features]
         return x + self.pe[:, :x.size(1)]
 
 class StockPredictor(pl.LightningModule):
@@ -96,9 +94,16 @@ class StockPredictor(pl.LightningModule):
         # Build model dynamically based on config
         layers = []
         
-        # Reshape input for attention: [batch, seq_len=1, features]
-        layers.append(nn.Unflatten(1, (1, input_size)))
-        layers.append(PositionalEncoding(input_size))
+        # Input layer
+        prev_size = input_size
+        layers.extend([
+            nn.Flatten(),
+            nn.Linear(prev_size, prev_size),
+            nn.Unflatten(1, (1, prev_size))  # Reshape for attention: [batch, 1, features]
+        ])
+        
+        # Add positional encoding
+        layers.append(PositionalEncoding(d_model=prev_size))
         
         # Add attention layer
         attn_config = MODEL_PARAMS['architecture']['attention']
