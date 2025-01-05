@@ -26,7 +26,15 @@ def download_stock_data(symbol, interval="1min", month=None):
     # Check cache first
     if is_cache_valid(cache_path):
         print(f"Loading cached data for {symbol} {'(current)' if month is None else f'({month})'}")
-        return pd.read_parquet(cache_path)
+        df = pd.read_parquet(cache_path)
+        # Verify if any day has fewer than 100 rows
+        
+        df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
+        row_counts = df.groupby('date').size()  # Count rows per day
+        valid_dates = row_counts[row_counts >= 200].index  # Get dates with at least 200 rows
+        df = df[df['date'].isin(valid_dates)]  # Keep only valid dates
+
+        return df
 
     # If not in cache, download
     print(f"Downloading fresh data for {symbol} {'(current)' if month is None else f'({month})'}")
@@ -43,6 +51,12 @@ def download_stock_data(symbol, interval="1min", month=None):
                 raise ValueError(f"Empty data received for {symbol}")
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             df.to_parquet(cache_path, index=False)
+            
+            df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
+            row_counts = df.groupby('date').size()  # Count rows per day
+            valid_dates = row_counts[row_counts >= 200].index  # Get dates with at least 200 rows
+            df = df[df['date'].isin(valid_dates)]  # Keep only valid dates
+        
             return df
         elif response.status_code == 429:
             print(f"Rate limit exceeded for {symbol}. Waiting 60 seconds...")
@@ -64,7 +78,8 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        for month in ["2022-12", "2023-12", "2024-06"]:
+        months = [f"{yy}-{mm:02d}" for yy in range(2021, 2025) for mm in range(1, 13)]
+        for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
                 future_dfs.append(future_df)
@@ -96,7 +111,6 @@ def split_data(stock_data):
     train, val, test = {}, {}, {}
     for symbol, df in stock_data.items():
         df = df.sort_values('timestamp')
-        df['date'] = df['timestamp'].dt.date
         grouped = df.groupby('date')
         days = list(grouped.groups.keys())
 
