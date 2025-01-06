@@ -56,9 +56,11 @@ def filter_and_fill(df):
         day_data['date'] = date  # Restore date column
 
         complete_df.append(day_data)
-
-        # Combine all processed days back into a single DataFrame
-    return pd.concat(complete_df, ignore_index=True)
+    
+    if not complete_df:
+        return pd.concat(complete_df, ignore_index=True)
+    else:
+        return None
 
 def download_stock_data(symbol, interval="1min", month=None):
     cache_path = get_cache_path(symbol, interval, month)
