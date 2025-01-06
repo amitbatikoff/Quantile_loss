@@ -57,7 +57,7 @@ def filter_and_fill(df):
 
         complete_df.append(day_data)
     
-    if not complete_df:
+    if complete_df:
         return pd.concat(complete_df, ignore_index=True)
     else:
         return None

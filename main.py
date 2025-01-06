@@ -35,7 +35,7 @@ def main():
 
     # Data Loader Creation and Logging
     start_time = time.time()
-    train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=False, persistent_workers=True)
+    train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, persistent_workers=True)
     val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False, persistent_workers=True)
     print("Data Loader Creation", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loader Creation", "Time (seconds)", time.time() - start_time,0)
