@@ -20,17 +20,17 @@ def main():
     
     start_time = time.time()
     # Data Loading and Logging
-    # stock_data = get_stock_data(SYMBOLS)
-    # train, val, _ = split_data(stock_data)
-    with open("train.pkl", "rb") as f:
-        train = pickle.load(f)
-    with open("val.pkl", "rb") as f:
-        val = pickle.load(f)
+    stock_data = get_stock_data(SYMBOLS)
+    train, val, _ = split_data(stock_data)
+    # with open("train.pkl", "rb") as f:
+    #     train = pickle.load(f)
+    # with open("val.pkl", "rb") as f:
+    #     val = pickle.load(f)
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 3)
+    num_workers = min(multiprocessing.cpu_count() - 1, 1)
     batch_size = DATALOADER_PARAMS['batch_size']
 
     # Data Loader Creation and Logging
@@ -41,7 +41,10 @@ def main():
     # task.get_logger().report_scalar("Data Loader Creation", "Time (seconds)", time.time() - start_time,0)
 
     # Sample Batch and Input Size (commented out for efficiency)
-    # sample_batch = next(iter(train_loader)) 
+    try:
+        sample_batch = next(iter(train_loader)) 
+    except Exception as e:
+        print('error')
     input_size = 195#sample_batch[0].shape[1] 
 
     # Total Steps for Scheduler

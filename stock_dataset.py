@@ -55,12 +55,13 @@ class StockDataset(Dataset):
         if self.mode == 'train':
             # For training, use price differences
             diffs = np.diff(input_values, prepend=input_values[0])
-            max_diff = diffs.max()
-            min_diff = diffs.min()
+            max_diff = np.percentile(diffs, 99)
+            min_diff = np.percentile(diffs, 1)
             if (max_diff - min_diff) == 0:
                 normalized_diffs = np.zeros_like(diffs)
             else:
-                normalized_diffs = (5*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
+                normalized_diffs = (21*(diffs - min_diff) / (max_diff - min_diff)).astype(np.uint8)
+                normalized_diffs = np.clip(normalized_diffs, -31, 31)
             input_tensor = torch.from_numpy(normalized_diffs).float()
         else:
             # For visualization, use raw prices
