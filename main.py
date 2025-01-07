@@ -20,12 +20,12 @@ def main():
     
     start_time = time.time()
     # Data Loading and Logging
-    # stock_data = get_stock_data(SYMBOLS)
-    # train, val, _ = split_data(stock_data)
-    with open("train.pkl", "rb") as f:
-        train = pickle.load(f)
-    with open("val.pkl", "rb") as f:
-        val = pickle.load(f)
+    stock_data = get_stock_data(SYMBOLS)
+    train, val, _ = split_data(stock_data)
+    # with open("train.pkl", "rb") as f:
+    #     train = pickle.load(f)
+    # with open("val.pkl", "rb") as f:
+    #     val = pickle.load(f)
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
