@@ -9,7 +9,7 @@ from config import SYMBOLS, DATALOADER_PARAMS, MODEL_PARAMS
 import time
 import os
 import hashlib
-import pickle
+# import pickle
 
 def calculate_folder_hash(folder_path):
     hash_obj = hashlib.md5()
@@ -38,33 +38,33 @@ def main():
     start_time = time.time()
     # Data Loading and Logging
 
-    saved_hash = None
-    if os.path.exists('updated_hash.pkl'):
-        print(f"File {'updated_hash.pkl'} exists. Opening it...")
-        with open('updated_hash.pkl', 'rb') as file:
-            saved_hash = pickle.load(file)
-    updated_hash = calculate_folder_hash('cache\\')
+    # saved_hash = None
+    # if os.path.exists('updated_hash.pkl'):
+    #     print(f"File {'updated_hash.pkl'} exists. Opening it...")
+    #     with open('updated_hash.pkl', 'rb') as file:
+    #         saved_hash = pickle.load(file)
+    # updated_hash = calculate_folder_hash('cache\\')
 
-    if saved_hash != updated_hash:
-        stock_data = get_stock_data(SYMBOLS)
-        train, val, _ = split_data(stock_data)
-        with open("train.pkl", "wb") as f:
-            pickle.dump(train, f)
-        with open("val.pkl", "wb") as f:
-            pickle.dump(val, f)
-        with open("updated_hash.pkl", "wb") as f:
-            pickle.dump(updated_hash, f)
-    else:
-        with open("train.pkl", "rb") as f:
-            train = pickle.load(f)
-        with open("val.pkl", "rb") as f:
-            val = pickle.load(f)
+    # if saved_hash != updated_hash:
+    stock_data = get_stock_data(SYMBOLS)
+    train, val, _ = split_data(stock_data)
+    #     with open("train.pkl", "wb") as f:
+    #         pickle.dump(train, f)
+    #     with open("val.pkl", "wb") as f:
+    #         pickle.dump(val, f)
+    #     with open("updated_hash.pkl", "wb") as f:
+    #         pickle.dump(updated_hash, f)
+    # else:
+    #     with open("train.pkl", "rb") as f:
+    #         train = pickle.load(f)
+    #     with open("val.pkl", "rb") as f:
+    #         val = pickle.load(f)
 
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 4)
+    num_workers = min(multiprocessing.cpu_count() - 1, 3)
     batch_size = DATALOADER_PARAMS['batch_size']
 
     # Data Loader Creation and Logging
