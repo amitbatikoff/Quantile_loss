@@ -64,7 +64,7 @@ def main():
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 3)
+    num_workers = min(multiprocessing.cpu_count() - 1, 4)
     batch_size = DATALOADER_PARAMS['batch_size']
 
     # Data Loader Creation and Logging
