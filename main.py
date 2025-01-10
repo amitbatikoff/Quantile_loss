@@ -46,8 +46,8 @@ def main():
     # updated_hash = calculate_folder_hash('cache\\')
 
     # if saved_hash != updated_hash:
-    stock_data = get_stock_data(SYMBOLS)
-    train, val, _ = split_data(stock_data)
+    # stock_data = get_stock_data(SYMBOLS)
+    # train, val, _ = split_data(stock_data)
     #     with open("train.pkl", "wb") as f:
     #         pickle.dump(train, f)
     #     with open("val.pkl", "wb") as f:
@@ -55,10 +55,10 @@ def main():
     #     with open("updated_hash.pkl", "wb") as f:
     #         pickle.dump(updated_hash, f)
     # else:
-    #     with open("train.pkl", "rb") as f:
-    #         train = pickle.load(f)
-    #     with open("val.pkl", "rb") as f:
-    #         val = pickle.load(f)
+    with open("train.pkl", "rb") as f:
+        train = pickle.load(f)
+    with open("val.pkl", "rb") as f:
+        val = pickle.load(f)
 
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
