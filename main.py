@@ -11,15 +11,35 @@ import time
 def main():
     # Start time measurement
     start_time = time.time()
-    stock_data = get_stock_data(SYMBOLS)
-    train, val, _ = split_data(stock_data)
-    end_time = time.time()
-    print(f"Data loadinf took {end_time - start_time:.2f} seconds")
+    # Data Loading and Logging
 
-    # Calculate optimal number of workers
-    num_workers = min(multiprocessing.cpu_count() - 1, 11)
+    # saved_hash = None
+    # if os.path.exists('updated_hash.pkl'):
+    #     print(f"File {'updated_hash.pkl'} exists. Opening it...")
+    #     with open('updated_hash.pkl', 'rb') as file:
+    #         saved_hash = pickle.load(file)
+    # updated_hash = calculate_folder_hash('cache\\')
 
-    # Use a smaller batch size or ensure dataset is large enough
+    # if saved_hash != updated_hash:
+    #     stock_data = get_stock_data(SYMBOLS)
+    #     train, val, _ = split_data(stock_data)
+    #     with open("train.pkl", "wb") as f:
+    #         pickle.dump(train, f)
+    #     with open("val.pkl", "wb") as f:
+    #         pickle.dump(val, f)
+    #     with open("updated_hash.pkl", "wb") as f:
+    #         pickle.dump(updated_hash, f)
+    # else:
+    with open("train.pkl", "rb") as f:
+        train = pickle.load(f)
+    with open("val.pkl", "rb") as f:
+        val = pickle.load(f)
+
+    print("Data Loading", "Time (seconds)", time.time() - start_time)
+    # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
+
+    # Worker and Batch Size Calculation
+    num_workers = min(multiprocessing.cpu_count() - 1, 4)
     batch_size = DATALOADER_PARAMS['batch_size']
     
     start_time = time.time()

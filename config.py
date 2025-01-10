@@ -26,7 +26,7 @@ MODEL_PARAMS = {
 }
 
 DATALOADER_PARAMS = {
-    "batch_size": 4096,
+    "batch_size": 1024,
     "pin_memory": True
 }
 

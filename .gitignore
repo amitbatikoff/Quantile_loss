@@ -47,3 +47,4 @@ cache/
 *.pkl
 /cache/
 temp_cache/
+*.pkl
