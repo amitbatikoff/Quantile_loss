@@ -38,14 +38,15 @@ def main():
     start_time = time.time()
     # Data Loading and Logging
 
-    saved_hash = None
-    if os.path.exists('updated_hash.pkl'):
-        print(f"File {'updated_hash.pkl'} exists. Opening it...")
-        with open('updated_hash.pkl', 'rb') as file:
-            saved_hash = pickle.load(file)
-    updated_hash = calculate_folder_hash('cache\\')
+    # saved_hash = None
+    # if os.path.exists('updated_hash.pkl'):
+    #     print(f"File {'updated_hash.pkl'} exists. Opening it...")
+    #     with open('updated_hash.pkl', 'rb') as file:
+    #         saved_hash = pickle.load(file)
+    # updated_hash = calculate_folder_hash('cache\\')
 
-    if saved_hash != updated_hash:
+    if False: #saved_hash != updated_hash:
+        print(f"hashas are not equal")
         stock_data = get_stock_data(SYMBOLS)
         train, val, _ = split_data(stock_data)
         with open("train.pkl", "wb") as f:
@@ -64,21 +65,21 @@ def main():
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 11)
+    num_workers = min(multiprocessing.cpu_count() - 1, 1)
     batch_size = DATALOADER_PARAMS['batch_size']
 
     # Data Loader Creation and Logging
     start_time = time.time()
-    train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True, persistent_workers=True)
+    train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=False, persistent_workers=True)
     val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=False, persistent_workers=True)
     print("Data Loader Creation", "Time (seconds)", time.time() - start_time)
     # task.get_logger().report_scalar("Data Loader Creation", "Time (seconds)", time.time() - start_time,0)
 
     # Sample Batch and Input Size (commented out for efficiency)
-    try:
-        sample_batch = next(iter(train_loader)) 
-    except Exception as e:
-        print('error')
+    # try:
+    #     sample_batch = next(iter(train_loader)) 
+    # except Exception as e:
+    #     print('error')
     input_size = 195#sample_batch[0].shape[1] 
 
     # Total Steps for Scheduler
