@@ -27,7 +27,7 @@ def main():
     # updated_hash = calculate_folder_hash('cache\\')
 
     # if False: #saved_hash != updated_hash:
-        print(f"hashas are not equal")
+        # print(f"hashas are not equal")
     #     stock_data = get_stock_data(SYMBOLS)
     #     train, val, _ = split_data(stock_data)
     #     with open("train.pkl", "wb") as f:
@@ -46,15 +46,14 @@ def main():
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 4)
     num_workers = min(multiprocessing.cpu_count() - 1, 1)
     batch_size = DATALOADER_PARAMS['batch_size']
     
     start_time = time.time()
     train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, 
-                            num_workers=num_workers, pin_memory=False, persistent_workers=True)
+                            num_workers=num_workers, pin_memory=False)
     val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False,
-                          num_workers=num_workers, pin_memory=True, persistent_workers=True)
+                          num_workers=num_workers, pin_memory=False)
     end_time = time.time()
     print(f"Dataset creation took {end_time - start_time:.2f} seconds")
 
