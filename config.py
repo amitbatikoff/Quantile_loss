@@ -18,15 +18,15 @@ MODEL_PARAMS = {
         "dropout_rates":  [0.2  , 0.2  , 0.1  , 0.0  ], 
         "use_batch_norm": [True , True, False, False], 
         "attention": {
-            "num_heads": 4,
-            "head_dim": 16,
+            "num_heads": 8,
+            "head_dim": 64,
             "attention_dropout": 0.1
         }
     }
 }
 
 DATALOADER_PARAMS = {
-    "batch_size": 512,
+    "batch_size": 8192,
     "pin_memory": True
 }
 

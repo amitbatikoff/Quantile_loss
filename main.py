@@ -7,6 +7,7 @@ from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
 from config import SYMBOLS, DATALOADER_PARAMS
 import time
+import pickle
 
 def main():
     # Start time measurement
@@ -61,6 +62,7 @@ def main():
 
     start_time = time.time()
     model = StockPredictor(input_size=input_size, total_steps=total_steps)
+
     end_time = time.time()
     print(f"model setting took {end_time - start_time:.2f} seconds")
 
