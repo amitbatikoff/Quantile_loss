@@ -45,3 +45,7 @@ unified_stock_model.pt
 lightning_logs/
 cache/
 *.pkl
+/cache/
+temp_cache/
+*.pkl
+*.pkl

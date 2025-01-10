@@ -409,7 +409,7 @@ def main():
                             cols[col_idx].metric(
                                 f"P{int(quantile*100)} Prediction", 
                                 f"${predictions[i]:.2f}",
-                                f"{((predictions[i] - actual_price) / actual_price * 100):.1f}%"
+                                f"{((predictions[i] - actual_price) / actual_price * 100)::.1f}%"
                             )
 
                 else:
