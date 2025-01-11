@@ -24,15 +24,21 @@ def is_cache_valid(cache_path):
     return cache_time > expiry_time
 
 def filter_and_fill(table):
+    # Ensure volume is int64
+    table = table.set_column(
+        table.schema.get_field_index('volume'),
+        'volume',
+        pa.array(table.column('volume').to_pandas().astype('int64'))
+    )
     # Extract date from timestamp
-    table = table.append_column('date', pc.date32(table['timestamp']))
+    table = table.append_column('date', pc.cast(table['timestamp'], pa.date32()))
 
     # Group by date and validate times
     valid_dates = []
     for date in pc.unique(table['date']).to_pylist():
         day_data = table.filter(pc.equal(table['date'], date))
-        start_time = day_data['timestamp'].min().time()
-        end_time = day_data['timestamp'].max().time()
+        start_time = pc.min(day_data['timestamp']).as_py().time()
+        end_time = pc.max(day_data['timestamp']).as_py().time()
     
         # Check if the day starts at 09:30 and ends at 15:59
         if start_time == pd.Timestamp("09:30").time() and end_time == pd.Timestamp("15:59").time():
@@ -56,11 +62,20 @@ def filter_and_fill(table):
         
         # Perform linear interpolation for missing values
         for col in complete_day_data.column_names:
-            complete_day_data = complete_day_data.set_column(
-                complete_day_data.schema.get_field_index(col),
-                col,
-                pc.fill_null(complete_day_data[col], pc.mean(complete_day_data[col]))
-            )
+            if pa.types.is_integer(complete_day_data[col].type) or pa.types.is_floating(complete_day_data[col].type):
+                complete_day_data = complete_day_data.set_column(
+                    complete_day_data.schema.get_field_index(col),
+                    col,
+                    pc.fill_null(complete_day_data[col], pc.mean(complete_day_data[col]))
+                )
+        
+        # Ensure volume is int64
+        complete_day_data = complete_day_data.set_column(
+            complete_day_data.schema.get_field_index('volume'),
+            'volume',
+            pa.array(complete_day_data.column('volume').to_pandas().astype('int64'))
+        )
+        
         complete_tables.append(complete_day_data)
     
     if complete_tables:
@@ -92,6 +107,7 @@ def download_stock_data(symbol, interval="1min", month=None):
             if df.empty:
                 raise ValueError(f"Empty data received for {symbol}")
             df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['volume'] = df['volume'].astype('int64')  # Ensure volume is int64
             table = pa.Table.from_pandas(df)
             pq.write_table(table, cache_path)
         
@@ -116,7 +132,7 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_tables = []
-        months = [f"{yy}-{mm:02d}" for yy in range(2022, 2025) for mm in range(1, 13)]
+        months = [f"{yy}-{mm:02d}" for yy in range(2021, 2025) for mm in range(1, 13)]
         for month in months:
             future_table = download_stock_data(symbol, month=month)
             if future_table is not None:
@@ -124,10 +140,26 @@ def get_stock_data(symbols):
         
         # Combine the tables if both current and future data are available
         if current_table is not None and future_tables:
+            future_tables = [t.set_column(
+                t.schema.get_field_index('volume'),
+                'volume',
+                pa.array(t.column('volume').to_pandas().astype('int64'))
+            ) for t in future_tables]  # Ensure volume is int64
+            current_table = current_table.set_column(
+                current_table.schema.get_field_index('volume'),
+                'volume',
+                pa.array(current_table.column('volume').to_pandas().astype('int64'))
+            )  # Ensure volume is int64 for current table
             table = pa.concat_tables([current_table] + future_tables)
-            table = table.drop_duplicates(subset=['timestamp'])
+            
+            # Ensure 'timestamp' field exists before removing duplicates
+            if 'timestamp' in table.schema.names:
+                _, indices = pc.unique(table['timestamp'], return_inverse=True)
+                table = table.take(indices)
+            
             stock_data[symbol] = table
-            all_timestamps.update(table['timestamp'].to_pandas().dt.strftime('%Y-%m-%d %H:%M:%S'))
+            if 'timestamp' in table.schema.names:
+                all_timestamps.update(table['timestamp'].to_pandas().dt.strftime('%Y-%m-%d %H:%M:%S'))
     
     # Rest of the function remains the same
     all_timestamps = sorted(list(all_timestamps))
