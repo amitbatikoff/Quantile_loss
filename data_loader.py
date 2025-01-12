@@ -47,6 +47,16 @@ def filter_and_fill(table):
     # Filter for valid dates
     table = table.filter(pc.is_in(table['date'], pa.array(valid_dates)))
 
+    # Filter out days with fewer than 100 rows
+    valid_dates = []
+    for date in pc.unique(table['date']).to_pylist():
+        day_data = table.filter(pc.equal(table['date'], date))
+        if day_data.num_rows >= 100:
+            valid_dates.append(date)
+    
+    # Filter for valid dates
+    table = table.filter(pc.is_in(table['date'], pa.array(valid_dates)))
+
     # Generate a complete list of timestamps for each date
     complete_tables = []
     for date in pc.unique(table['date']).to_pylist():
@@ -79,7 +89,14 @@ def filter_and_fill(table):
         complete_tables.append(complete_day_data)
     
     if complete_tables:
-        return pa.concat_tables(complete_tables)
+        final_table = pa.concat_tables(complete_tables)
+        # Ensure 'timestamp' column is included
+        if 'timestamp' not in final_table.column_names:
+            min_timestamp = pc.min(table['timestamp']).as_py()
+            max_timestamp = pc.max(table['timestamp']).as_py()
+            all_timestamps = pd.date_range(start=min_timestamp, end=max_timestamp, freq='1min')
+            final_table = final_table.append_column('timestamp', pa.array(all_timestamps[:len(final_table)]))
+        return final_table
     else:
         return None
 
@@ -152,10 +169,13 @@ def get_stock_data(symbols):
             )  # Ensure volume is int64 for current table
             table = pa.concat_tables([current_table] + future_tables)
             
-            # Ensure 'timestamp' field exists before removing duplicates
-            if 'timestamp' in table.schema.names:
-                _, indices = pc.unique(table['timestamp'], return_inverse=True)
-                table = table.take(indices)
+            # Filter out days with fewer than 100 rows
+            valid_dates = []
+            for date in pc.unique(table['date']).to_pylist():
+                day_data = table.filter(pc.equal(table['date'], date))
+                if day_data.num_rows >= 100:
+                    valid_dates.append(date)
+            table = table.filter(pc.is_in(table['date'], pa.array(valid_dates)))
             
             stock_data[symbol] = table
             if 'timestamp' in table.schema.names:
@@ -164,16 +184,6 @@ def get_stock_data(symbols):
     # Rest of the function remains the same
     all_timestamps = sorted(list(all_timestamps))
     
-    for symbol in stock_data:
-        full_idx = pd.DatetimeIndex(all_timestamps)
-        stock_data[symbol] = pa.Table.from_pandas(
-            stock_data[symbol].to_pandas().set_index('timestamp').reindex(full_idx).ffill().bfill().reset_index()
-        )
-    
-    # Convert DataFrames to Arrow Tables before returning
-    for symbol in stock_data:
-        stock_data[symbol] = pa.Table.from_pandas(stock_data[symbol])
-    
     return stock_data
 
 def split_data(stock_data):
@@ -181,7 +191,7 @@ def split_data(stock_data):
     for symbol, table in stock_data.items():
         table = table.sort_by('timestamp')
         grouped = table.group_by('date')
-        days = list(grouped.groups.keys())
+        days = [group[0] for group in grouped.aggregate([]).to_pandas().itertuples(index=False)]
 
         train_end = int(len(days) * 0.6)
         val_end = int(len(days) * 0.8)

@@ -39,17 +39,18 @@ class StockDataset(Dataset):
                         )
                     
                     self.data[symbol] = table
-                    dates = pc.unique(pc.cast(table['timestamp'], pa.date32())).to_pylist()
+                    dates = pc.unique(pc.cast(table['date'], pa.date32())).to_pylist()
                     self.date_symbols.extend([(date, symbol) for date in dates])
                 except Exception as e:
                     raise ValueError(f"Error processing timestamps for {symbol}: {str(e)}")
 
     def __len__(self):
+        print(len(self.date_symbols))
         return len(self.date_symbols)
 
     def __getitem__(self, idx):
         date, symbol = self.date_symbols[idx]
-        day_data = self.data[symbol].filter(pc.equal(pc.cast(self.data[symbol]['timestamp'], pa.date32()), date))
+        day_data = self.data[symbol].filter(pc.equal(pc.cast(self.data[symbol]['date'], pa.date32()), date))
         
         if day_data.num_rows == 0:
             raise IndexError(f"No data found for {symbol} on {date}")
@@ -60,6 +61,9 @@ class StockDataset(Dataset):
         
         # Get input values and target
         input_values = day_data['close'][:input_split].to_numpy()
+        
+        if len(input_values) == 0:
+            raise IndexError(f"No input values found for {symbol} on {date}")
         
         # Convert to tensors
         if self.mode == 'train':
