@@ -24,10 +24,10 @@ def main():
     # if saved_hash != updated_hash:
     stock_data = get_stock_data(SYMBOLS)
     train, val, _ = split_data(stock_data)
-    with open("train.pkl", "wb") as f:
-        pickle.dump(train, f)
-    with open("val.pkl", "wb") as f:
-        pickle.dump(val, f)
+    # with open("train.pkl", "wb") as f:
+    #     pickle.dump(train, f)
+    # with open("val.pkl", "wb") as f:
+    #     pickle.dump(val, f)
 
         # with open("updated_hash.pkl", "wb") as f:
         #     pickle.dump(updated_hash, f)

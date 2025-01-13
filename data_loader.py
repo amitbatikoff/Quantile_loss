@@ -15,6 +15,9 @@ def get_cache_path(symbol, interval, month=None):
     cache_file = f"{symbol}_{interval}.parquet" if month is None else f"{symbol}_{interval}_{month}.parquet"
     return os.path.join(CACHE_DIR, cache_file)
 
+def get_combined_cache_path(symbol):
+    return get_cache_path(symbol, "combined")
+
 def is_cache_valid(cache_path):
     if not os.path.exists(cache_path):
         return False
@@ -108,6 +111,14 @@ def get_stock_data(symbols):
     
     for i in trange(len(symbols)): 
         symbol = symbols[i]
+        combined_cache_path = get_combined_cache_path(symbol)
+        if is_cache_valid(combined_cache_path):
+            print(f"Loading combined cached data for {symbol}")
+            df = pd.read_parquet(combined_cache_path)
+            stock_data[symbol] = df
+            all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
+            continue
+
         # Download current data
         current_df = download_stock_data(symbol)
         
@@ -123,6 +134,7 @@ def get_stock_data(symbols):
         if current_df is not None and future_dfs:
             df = pd.concat([current_df] + future_dfs, ignore_index=True)
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
+            df.to_parquet(combined_cache_path, index=False)
             stock_data[symbol] = df
             all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
     
