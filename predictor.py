@@ -169,7 +169,7 @@ class StockPredictor(pl.LightningModule):
         scheduler_config = {
             "scheduler": torch.optim.lr_scheduler.CyclicLR(
                 optimizer,
-                base_lr=lr/100000,  # lower learning rate
+                base_lr=lr/1000,  # lower learning rate
                 max_lr=lr,      # upper learning rate
                 step_size_up=200,  # steps per half cycle
                 mode='exp_range',  # exponential scaling
