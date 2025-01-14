@@ -124,7 +124,7 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        months = [f"{yy}-{mm:02d}" for yy in range(2021, 2025) for mm in range(1, 13)]
+        months = [f"{yy}-{mm:02d}" for yy in range(2019, 2025) for mm in range(1, 13)]
         for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
@@ -195,6 +195,9 @@ def split_data(stock_data):
     val_processed = prepare_dataset_data(val, val_symbols, 'train')
     test_processed = prepare_dataset_data(test, test_symbols, 'viz')
     
+    print(f"Train: {len(train_processed[0])} days, {sum(len(v[0]) for v in train_processed[0].values())} data points")
+    print(f"Val: {len(val_processed[0])} days, {sum(len(v[0]) for v in val_processed[0].values())} data points")
+    print(f"Test: {len(test_processed[0])} days, {sum(len(v[0]) for v in test_processed[0].values())} data points")
     return train_processed, val_processed, test_processed
 
 def process_day_data(day_data, mode='train', input_split=None):

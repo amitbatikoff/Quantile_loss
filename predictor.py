@@ -82,6 +82,23 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         return x + self.pe[:, :x.size(1)]
 
+class T5Block(nn.Module):
+    def __init__(self, input_dim, num_heads, head_dim, feedforward_dim, dropout=0.1):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(input_dim)
+        self.ln2 = nn.LayerNorm(input_dim)
+        self.self_attn = MultiHeadAttention(input_dim, num_heads, head_dim, dropout=dropout)
+        self.feedforward = nn.Sequential(
+            nn.Linear(input_dim, feedforward_dim),
+            nn.ReLU(),
+            nn.Linear(feedforward_dim, input_dim)
+        )
+
+    def forward(self, x):
+        x = x + self.self_attn(self.ln1(x))
+        x = x + self.feedforward(self.ln2(x))
+        return x
+
 class StockPredictor(pl.LightningModule):
     def __init__(self, input_size, total_steps=1000):
         super(StockPredictor, self).__init__()
@@ -107,14 +124,18 @@ class StockPredictor(pl.LightningModule):
         
         # Add attention layer
         attn_config = MODEL_PARAMS['architecture']['attention']
-        layers.append(
-            MultiHeadAttention(
-                input_dim=prev_size,
-                num_heads=attn_config['num_heads'],
-                head_dim=attn_config['head_dim'],
-                dropout=attn_config['attention_dropout']
+        num_blocks = MODEL_PARAMS['architecture']['num_attention_blocks']
+        feedforward_dim = MODEL_PARAMS['architecture']['feedforward_dim']
+        for _ in range(num_blocks):
+            layers.append(
+                T5Block(
+                    prev_size,
+                    attn_config['num_heads'],
+                    attn_config['head_dim'],
+                    feedforward_dim,
+                    attn_config['attention_dropout']
+                )
             )
-        )
         
         layers.append(nn.Flatten())  # Flatten after attention
         

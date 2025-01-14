@@ -9,7 +9,7 @@ with open(os.path.join(os.path.dirname(__file__), 'stock_list.json'), 'r') as f:
     SYMBOLS = json.load(f)['symbols']
 
 MODEL_PARAMS = {
-    "learning_rate": 1e-3,
+    "learning_rate": 1e-4,
     "input_ratio": 0.5,  # Added for consistency
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
@@ -18,10 +18,12 @@ MODEL_PARAMS = {
         "dropout_rates":  [0.2  , 0.2  , 0.1  , 0.0  ], 
         "use_batch_norm": [True , True, False, False], 
         "attention": {
-            "num_heads": 8,
-            "head_dim": 64,
-            "attention_dropout": 0.1
-        }
+            "num_heads": 2,
+            "head_dim": 16,
+            "attention_dropout": 0.3
+        },
+        "num_attention_blocks": 3,
+        "feedforward_dim": 32
     }
 }
 
