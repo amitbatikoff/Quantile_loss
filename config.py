@@ -23,14 +23,18 @@ MODEL_PARAMS = {
             "attention_dropout": 0.25
         },
         "num_attention_blocks": 5,
-        "feedforward_dim": 32
+        "feedforward_dim": 64
     }
 }
 
 DATALOADER_PARAMS = {
     "batch_size": 32768,
-    "pin_memory": True
 }
 
-CACHE_DIR = "cache"
-CACHE_EXPIRY_DAYS = 10  # How many days before cache expires
+DATA_PARAMS = {
+    "train_end": 0.8,
+    "firtst_year": "2019",
+    "last_year": "2025",
+    "CACHE_DIR": "cache",
+    "CACHE_EXPIRY_DAYS": 10
+}

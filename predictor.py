@@ -194,7 +194,7 @@ class StockPredictor(pl.LightningModule):
                 max_lr=lr,      # upper learning rate
                 step_size_up=200,  # steps per half cycle
                 mode='exp_range',  # exponential scaling
-                gamma=0.99994,    # decay factor
+                gamma=0.999994,    # decay factor
                 cycle_momentum=False  # don't cycle momentum
             ),
             "interval": "step",  # update lr every step

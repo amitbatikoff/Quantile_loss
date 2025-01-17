@@ -6,14 +6,14 @@ from io import StringIO
 import time
 import os
 from datetime import datetime, timedelta
-from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS, MODEL_PARAMS
+from config import API_KEY, BASE_URL, MODEL_PARAMS, DATA_PARAMS
 from tqdm import trange
 
 def get_cache_path(symbol, interval, month=None):
-    if not os.path.exists(CACHE_DIR):
-        os.makedirs(CACHE_DIR)
+    if not os.path.exists(DATA_PARAMS['CACHE_DIR']):
+        os.makedirs(DATA_PARAMS['CACHE_DIR'])
     cache_file = f"{symbol}_{interval}.parquet" if month is None else f"{symbol}_{interval}_{month}.parquet"
-    return os.path.join(CACHE_DIR, cache_file)
+    return os.path.join(DATA_PARAMS['CACHE_DIR'], cache_file)
 
 def get_combined_cache_path(symbol):
     return get_cache_path(symbol, "combined")
@@ -23,7 +23,7 @@ def is_cache_valid(cache_path):
         return False
     
     cache_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
-    expiry_time = datetime.now() - timedelta(days=CACHE_EXPIRY_DAYS)
+    expiry_time = datetime.now() - timedelta(days=DATA_PARAMS['CACHE_EXPIRY_DAYS'])
     return cache_time > expiry_time
 
 def filter_and_fill(df):
@@ -124,7 +124,8 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        months = [f"{yy}-{mm:02d}" for yy in range(2019, 2025) for mm in range(1, 13)]
+        months = [f"{yy}-{mm:02d}" for yy in range(int(DATA_PARAMS['firtst_year']), int(DATA_PARAMS['last_year']) + 1)
+                  for mm in range(1, 13)]
         for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
@@ -166,8 +167,8 @@ def split_data(stock_data):
         
         days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
 
-        train_end = int(len(days) * 0.8)
-        val_end = int(len(days) * 0.9)
+        train_end = int(len(days) * DATA_PARAMS['train_end'])
+        val_end = int(len(days))
 
         # Split the data
         train_df = df.filter(pl.col('date').is_in(days[:train_end]))
