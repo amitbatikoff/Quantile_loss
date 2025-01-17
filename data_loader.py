@@ -78,7 +78,7 @@ def get_stock_data(symbols):
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        months = [f"{yy}-{mm:02d}" for yy in range(2021, 2025) for mm in range(1, 13)]
+        months = [f"{yy}-{mm:02d}" for yy in range(2022, 2025) for mm in range(1, 13)]
         for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:

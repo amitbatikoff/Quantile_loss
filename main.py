@@ -7,6 +7,7 @@ from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
 from config import SYMBOLS, DATALOADER_PARAMS
 import time
+import pickle
 
 def main():
     # Start time measurement
@@ -46,14 +47,14 @@ def main():
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 1)
+    num_workers = min(multiprocessing.cpu_count() - 1, 2)
     batch_size = DATALOADER_PARAMS['batch_size']
     
     start_time = time.time()
     train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, 
-                            num_workers=num_workers, pin_memory=False)
+                            num_workers=num_workers, pin_memory=False,persistent_workers=True)
     val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False,
-                          num_workers=num_workers, pin_memory=False)
+                          num_workers=num_workers, pin_memory=False,persistent_workers=True)
     end_time = time.time()
     print(f"Dataset creation took {end_time - start_time:.2f} seconds")
 
