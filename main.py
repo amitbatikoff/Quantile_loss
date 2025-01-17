@@ -21,6 +21,12 @@ def main():
     #     with open('updated_hash.pkl', 'rb') as file:
     #         saved_hash = pickle.load(file)
     # updated_hash = calculate_folder_hash('cache\\')
+    # saved_hash = None
+    # if os.path.exists('updated_hash.pkl'):
+    #     print(f"File {'updated_hash.pkl'} exists. Opening it...")
+    #     with open('updated_hash.pkl', 'rb') as file:
+    #         saved_hash = pickle.load(file)
+    # updated_hash = calculate_folder_hash('cache\\')
 
     # if saved_hash != updated_hash:
     # stock_data = get_stock_data(SYMBOLS)

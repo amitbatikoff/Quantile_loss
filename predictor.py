@@ -9,18 +9,22 @@ import math
 class QuantileLoss(nn.Module):
     def __init__(self, quantiles):
         super(QuantileLoss, self).__init__()
-        self.quantiles = torch.tensor(quantiles, dtype=torch.float32)
+        self.register_buffer('quantiles', torch.tensor(quantiles, dtype=torch.float32))
 
     def forward(self, preds, target):
+        # Ensure quantiles are on the same device as preds
+        quantiles = self.quantiles.to(preds.device)
+
         # preds shape: [batch_size, num_quantiles]
         # target shape: [batch_size, 1]
         target = target.expand_as(preds)
         errors = target - preds
         loss = torch.max(
-            (self.quantiles - 1) * errors,
-            self.quantiles * errors
+            (quantiles - 1) * errors,
+            quantiles * errors
         )
         return loss.mean()
+    
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, input_dim, num_heads, head_dim, dropout=0.1):

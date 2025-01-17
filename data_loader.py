@@ -26,48 +26,6 @@ def is_cache_valid(cache_path):
     expiry_time = datetime.now() - timedelta(days=DATA_PARAMS['CACHE_EXPIRY_DAYS'])
     return cache_time > expiry_time
 
-def filter_and_fill(df):
-    # Extract date from timestamp
-    df['date'] = df['timestamp'].dt.date  
-
-    # Group by date and validate times
-    valid_dates = []
-    for date, group in df.groupby('date'):
-        start_time = group['timestamp'].min().time()
-        end_time = group['timestamp'].max().time()
-    
-        # Check if the day starts at 09:30 and ends at 15:59
-        if start_time == pd.Timestamp("09:30").time() and end_time == pd.Timestamp("15:59").time():
-            valid_dates.append(date)
-
-        # Filter for valid dates
-    df = df[df['date'].isin(valid_dates)]
-
-    # Generate a complete list of timestamps for each date
-    complete_df = []
-    for date in df['date'].unique():
-        day_data = df[df['date'] == date]
-        start = pd.Timestamp(f"{date} 09:30")
-        end = pd.Timestamp(f"{date} 15:59")
-        complete_timestamps = pd.date_range(start=start, end=end, freq='1min')
-        
-        # Reindex day_data to include all minutes between 09:30 and 15:59
-        day_data = day_data.set_index('timestamp').reindex(complete_timestamps)
-        day_data.index.name = 'timestamp'
-        
-        # Perform linear interpolation for missing values
-        for col in day_data:
-            day_data[col] = pd.to_numeric(day_data[col], errors='coerce')
-        day_data = day_data.interpolate(method='linear').reset_index()
-        day_data['date'] = date  # Restore date column
-
-        complete_df.append(day_data)
-    
-    if complete_df:
-        return pd.concat(complete_df, ignore_index=True)
-    else:
-        return None
-
 def download_stock_data(symbol, interval="1min", month=None):
     cache_path = get_cache_path(symbol, interval, month)
     
@@ -76,7 +34,13 @@ def download_stock_data(symbol, interval="1min", month=None):
         print(f"Loading cached data for {symbol} {'(current)' if month is None else f'({month})'}")
         df = pd.read_parquet(cache_path)
         # Verify if any day has fewer than 100 rows
-        return filter_and_fill(df)
+        
+        df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
+        row_counts = df.groupby('date').size()  # Count rows per day
+        valid_dates = row_counts[row_counts >= 200].index  # Get dates with at least 200 rows
+        df = df[df['date'].isin(valid_dates)]  # Keep only valid dates
+
+        return df
 
     # If not in cache, download
     print(f"Downloading fresh data for {symbol} {'(current)' if month is None else f'({month})'}")
@@ -93,8 +57,13 @@ def download_stock_data(symbol, interval="1min", month=None):
                 raise ValueError(f"Empty data received for {symbol}")
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             df.to_parquet(cache_path, index=False)
+            
+            df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
+            row_counts = df.groupby('date').size()  # Count rows per day
+            valid_dates = row_counts[row_counts >= 200].index  # Get dates with at least 200 rows
+            df = df[df['date'].isin(valid_dates)]  # Keep only valid dates
         
-            return filter_and_fill(df)
+            return df
         elif response.status_code == 429:
             print(f"Rate limit exceeded for {symbol}. Waiting 60 seconds...")
             time.sleep(60)
