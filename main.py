@@ -11,6 +11,7 @@ import pickle
 
 def main():
     # Start time measurement
+    print('start')
     start_time = time.time()
     # Data Loading and Logging
 
@@ -22,8 +23,12 @@ def main():
     # updated_hash = calculate_folder_hash('cache\\')
 
     # if saved_hash != updated_hash:
-    stock_data = get_stock_data(SYMBOLS)
-    train, val, _ = split_data(stock_data)
+    # stock_data = get_stock_data(SYMBOLS)
+    # print("Data Loading", "Time (seconds)", time.time() - start_time)
+    # start_time = time.time()
+    # train, val, _ = split_data(stock_data)
+    # print("Data Split", "Time (seconds)", time.time() - start_time)
+
     # with open("train.pkl", "wb") as f:
     #     pickle.dump(train, f)
     # with open("val.pkl", "wb") as f:
@@ -32,12 +37,12 @@ def main():
         # with open("updated_hash.pkl", "wb") as f:
         #     pickle.dump(updated_hash, f)
     # else:
-    # with open("train.pkl", "rb") as f:
-    #     train = pickle.load(f)
-    # with open("val.pkl", "rb") as f:
-    #     val = pickle.load(f)
+    with open("train.pkl", "rb") as f:
+        train = pickle.load(f)
+    with open("val.pkl", "rb") as f:
+        val = pickle.load(f)
 
-    print("Data Loading", "Time (seconds)", time.time() - start_time)
+
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
@@ -78,7 +83,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=75,
+        patience=150,
         mode='min'
     )
 
@@ -87,7 +92,7 @@ def main():
 
     # Initialize trainer with scheduler
     trainer = pl.Trainer(
-        max_epochs=200,
+        max_epochs=6000,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,
