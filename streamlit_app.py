@@ -53,7 +53,7 @@ def prepare_input_data(dataset, index):
         st.error(f"Error preparing input data: {str(e)}")
         return None, None, None
 
-def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date):
+def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date, use_log_scale=False):
     fig = go.Figure()
     
     # Convert dictionary to DataFrame if necessary
@@ -118,11 +118,11 @@ def create_prediction_plot(day_data, input_data, actual_price, predictions, sele
         yaxis_title='Price',
         hovermode='x unified'
     )
-    
+    if use_log_scale:
+        fig.update_layout(yaxis_type='log')
     return fig
 
-@st.cache_data
-def calculate_stock_performance(_model, test_data):
+def calculate_stock_performance(_model, test_data):  # <-- remove @st.cache_data
     if not hasattr(_model, '_input_size'):
         st.error("Invalid model: missing input_size attribute")
         return []
@@ -225,7 +225,7 @@ def load_metrics_for_version(version):
         st.error(f"Error loading metrics for version {version}: {str(e)}")
         return None
 
-def plot_training_metrics(metrics_df):
+def plot_training_metrics(metrics_df, use_log_scale=False):
     if metrics_df is None or metrics_df.empty:
         return None
         
@@ -262,7 +262,8 @@ def plot_training_metrics(metrics_df):
         hovermode='x unified',
         showlegend=True
     )
-    
+    if use_log_scale:
+        fig.update_layout(yaxis_type='log')
     return fig
 
 def main():
@@ -286,6 +287,8 @@ def main():
     except Exception as e:
         print(f"Error loading model: {str(e)}")
         model_loaded = False
+
+    use_log_scale = st.sidebar.checkbox("Use log scale for plots?")
 
     # Create tabs
     tab1, tab2 = st.tabs([ "Training Metrics","Predictions"])
@@ -315,7 +318,7 @@ def main():
         if selected_version is not None:
             metrics_df = load_metrics_for_version(selected_version)
             if metrics_df is not None:
-                fig = plot_training_metrics(metrics_df)
+                fig = plot_training_metrics(metrics_df, use_log_scale=use_log_scale)
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
                     
@@ -385,7 +388,8 @@ def main():
                         input_values,
                         actual_price,
                         predictions,
-                        selected_date
+                        selected_date,
+                        use_log_scale=use_log_scale
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     

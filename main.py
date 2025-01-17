@@ -11,6 +11,7 @@ import pickle
 
 def main():
     # Start time measurement
+    print('start')
     start_time = time.time()
     # Data Loading and Logging
 
@@ -27,34 +28,38 @@ def main():
     #         saved_hash = pickle.load(file)
     # updated_hash = calculate_folder_hash('cache\\')
 
-    # if False: #saved_hash != updated_hash:
-        # print(f"hashas are not equal")
-    #     stock_data = get_stock_data(SYMBOLS)
-    #     train, val, _ = split_data(stock_data)
-    #     with open("train.pkl", "wb") as f:
-    #         pickle.dump(train, f)
-    #     with open("val.pkl", "wb") as f:
-    #         pickle.dump(val, f)
-    #     with open("updated_hash.pkl", "wb") as f:
-    #         pickle.dump(updated_hash, f)
+    # if saved_hash != updated_hash:
+    # stock_data = get_stock_data(SYMBOLS)
+    # print("Data Loading", "Time (seconds)", time.time() - start_time)
+    # start_time = time.time()
+    # train, val, _ = split_data(stock_data)
+    # print("Data Split", "Time (seconds)", time.time() - start_time)
+
+    # with open("train.pkl", "wb") as f:
+    #     pickle.dump(train, f)
+    # with open("val.pkl", "wb") as f:
+    #     pickle.dump(val, f)
+
+        # with open("updated_hash.pkl", "wb") as f:
+        #     pickle.dump(updated_hash, f)
     # else:
     with open("train.pkl", "rb") as f:
         train = pickle.load(f)
     with open("val.pkl", "rb") as f:
         val = pickle.load(f)
 
-    print("Data Loading", "Time (seconds)", time.time() - start_time)
+
     # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
-    num_workers = min(multiprocessing.cpu_count() - 1, 2)
+    num_workers = min(multiprocessing.cpu_count() - 1, 5)
     batch_size = DATALOADER_PARAMS['batch_size']
     
     start_time = time.time()
     train_loader = DataLoader(StockDataset(train), batch_size=batch_size, shuffle=True, 
-                            num_workers=num_workers, pin_memory=False,persistent_workers=True)
+                            num_workers=num_workers, pin_memory=True,persistent_workers=True)
     val_loader = DataLoader(StockDataset(val), batch_size=batch_size, shuffle=False,
-                          num_workers=num_workers, pin_memory=False,persistent_workers=True)
+                          num_workers=num_workers, pin_memory=True,persistent_workers=True)
     end_time = time.time()
     print(f"Dataset creation took {end_time - start_time:.2f} seconds")
 
@@ -69,6 +74,7 @@ def main():
 
     start_time = time.time()
     model = StockPredictor(input_size=input_size, total_steps=total_steps)
+
     end_time = time.time()
     print(f"model setting took {end_time - start_time:.2f} seconds")
 
@@ -83,7 +89,7 @@ def main():
 
     early_stop_callback = pl.callbacks.EarlyStopping(
         monitor='val_loss',
-        patience=75,
+        patience=150,
         mode='min'
     )
 
@@ -92,7 +98,7 @@ def main():
 
     # Initialize trainer with scheduler
     trainer = pl.Trainer(
-        max_epochs=200,
+        max_epochs=6000,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,

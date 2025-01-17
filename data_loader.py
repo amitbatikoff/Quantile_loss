@@ -1,16 +1,22 @@
 import requests
 import pandas as pd
+import polars as pl
+import numpy as np
 from io import StringIO
 import time
 import os
 from datetime import datetime, timedelta
-from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS
+from config import API_KEY, BASE_URL, CACHE_DIR, CACHE_EXPIRY_DAYS, MODEL_PARAMS
+from tqdm import trange
 
 def get_cache_path(symbol, interval, month=None):
     if not os.path.exists(CACHE_DIR):
         os.makedirs(CACHE_DIR)
     cache_file = f"{symbol}_{interval}.parquet" if month is None else f"{symbol}_{interval}_{month}.parquet"
     return os.path.join(CACHE_DIR, cache_file)
+
+def get_combined_cache_path(symbol):
+    return get_cache_path(symbol, "combined")
 
 def is_cache_valid(cache_path):
     if not os.path.exists(cache_path):
@@ -72,13 +78,22 @@ def get_stock_data(symbols):
     stock_data = {}
     all_timestamps = set()
     
-    for symbol in symbols:
+    for i in trange(len(symbols)): 
+        symbol = symbols[i]
+        combined_cache_path = get_combined_cache_path(symbol)
+        if is_cache_valid(combined_cache_path):
+            print(f"Loading combined cached data for {symbol}")
+            df = pd.read_parquet(combined_cache_path)
+            stock_data[symbol] = df
+            all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
+            continue
+
         # Download current data
         current_df = download_stock_data(symbol)
         
         # Download data for the months April 2024 to June 2024
         future_dfs = []
-        months = [f"{yy}-{mm:02d}" for yy in range(2022, 2025) for mm in range(1, 13)]
+        months = [f"{yy}-{mm:02d}" for yy in range(2019, 2025) for mm in range(1, 13)]
         for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
@@ -88,6 +103,7 @@ def get_stock_data(symbols):
         if current_df is not None and future_dfs:
             df = pd.concat([current_df] + future_dfs, ignore_index=True)
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
+            df.to_parquet(combined_cache_path, index=False)
             stock_data[symbol] = df
             all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
     
@@ -105,20 +121,114 @@ def get_stock_data(symbols):
             .rename(columns={'index': 'timestamp'})
         )
     
+    # Convert to Polars DataFrames
+    stock_data = {symbol: pl.from_pandas(df) for symbol, df in stock_data.items()}
+    
     return stock_data
 
 def split_data(stock_data):
     train, val, test = {}, {}, {}
+    train_symbols, val_symbols, test_symbols = [], [], []
+    
     for symbol, df in stock_data.items():
-        df = df.sort_values('timestamp')
-        grouped = df.groupby('date')
-        days = list(grouped.groups.keys())
+        df = df.sort('timestamp')
+        
+        days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
 
-        train_end = int(len(days) * 0.6)
-        val_end = int(len(days) * 0.8)
+        train_end = int(len(days) * 0.8)
+        val_end = int(len(days) * 0.9)
 
-        train[symbol] = df[df['date'].isin(days[:train_end])]
-        val[symbol] = df[df['date'].isin(days[train_end:val_end])]
-        test[symbol] = df[df['date'].isin(days[val_end:])]
+        # Split the data
+        train_df = df.filter(pl.col('date').is_in(days[:train_end]))
+        val_df = df.filter(pl.col('date').is_in(days[train_end:val_end]))
+        test_df = df.filter(pl.col('date').is_in(days[val_end:]))
 
-    return train, val, test
+        # Process each split
+        if not train_df.is_empty():
+            train[symbol] = train_df
+            train_dates = train_df['timestamp'].dt.date().unique().to_list()
+            train_symbols.extend([(date, symbol) for date in train_dates])
+            
+        if not val_df.is_empty():
+            val[symbol] = val_df
+            val_dates = val_df['timestamp'].dt.date().unique().to_list()
+            val_symbols.extend([(date, symbol) for date in val_dates])
+            
+        if not test_df.is_empty():
+            test[symbol] = test_df
+            test_dates = test_df['timestamp'].dt.date().unique().to_list()
+            test_symbols.extend([(date, symbol) for date in test_dates])
+
+    # Process data for each split
+    train_processed = prepare_dataset_data(train, train_symbols, 'train')
+    val_processed = prepare_dataset_data(val, val_symbols, 'train')
+    test_processed = prepare_dataset_data(test, test_symbols, 'viz')
+    
+    print(f"Train: {len(train_processed[0])} days, {sum(len(v) for v in train_processed[0].values())} data points")
+    print(f"Val: {len(val_processed[0])} days, {sum(len(v) for v in val_processed[0].values())} data points")
+    print(f"Test: {len(test_processed[0])} days, {sum(len(v) for v in test_processed[0].values())} data points")
+    return train_processed, val_processed, test_processed
+
+def process_day_data(day_data, mode='train', input_split=None):
+    """Process a single day's data for model input"""
+    input_values = day_data['close'][:input_split].to_numpy()
+    
+    if mode == 'train':
+        # Calculate normalized price differences
+        diffs = np.diff(input_values, prepend=input_values[0])
+        max_diff = np.percentile(diffs, 99)
+        min_diff = np.percentile(diffs, 1)
+        
+        if (max_diff - min_diff) == 0:
+            normalized_diffs = np.zeros_like(diffs)
+        else:
+            normalized_diffs = (21*(diffs - min_diff) / (max_diff - min_diff)).astype(np.int8)
+            normalized_diffs = np.clip(normalized_diffs, -31, 31)
+        return pl.Series(normalized_diffs)
+    else:
+        return pl.Series(input_values)
+
+def prepare_stock_data(stock_data):
+    """Prepare stock data dictionary with processed data"""
+    processed_data = {}
+    date_symbols = []
+    
+    for symbol, df in stock_data.items():
+        if df is not None and not df.is_empty():
+            required_cols = {'timestamp', 'close'}
+            missing_cols = required_cols - set(df.columns)
+            if missing_cols:
+                raise ValueError(f"Missing required columns for {symbol}: {missing_cols}")
+            
+            try:
+                processed_data[symbol] = df
+                dates = df['timestamp'].dt.date().unique().to_list()
+                date_symbols.extend([(date, symbol) for date in dates])
+            except Exception as e:
+                raise ValueError(f"Error processing timestamps for {symbol}: {str(e)}")
+    
+    return processed_data, date_symbols
+
+def prepare_dataset_data(data_dict, date_symbols, mode='train'):
+    """Convert raw data into format ready for StockDataset"""
+    processed_data = {}
+    
+    for symbol, df in data_dict.items():
+        processed_data[symbol] = {}
+        for date in df['timestamp'].dt.date().unique():
+            day_data = df.filter(pl.col('timestamp').dt.date() == date)
+            if len(day_data) == 0:
+                continue
+                
+            input_split = int(len(day_data) * MODEL_PARAMS['input_ratio'])
+            target_split = int(len(day_data) * MODEL_PARAMS['target_ratio'])
+            
+            # Process input values
+            input_values = process_day_data(day_data, mode, input_split)
+            
+            # Calculate target
+            target_value = (day_data['close'][target_split:].max() - day_data['close'][input_split-1])
+            
+            processed_data[symbol][date] = (input_values, target_value)
+    
+    return processed_data, date_symbols
