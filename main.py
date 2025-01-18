@@ -110,7 +110,7 @@ def main():
 
     # Create loggers
     tb_logger = TensorBoardLogger(save_dir='lightning_logs', name='quantile_loss')
-    clearml_logger = ClearMLLogger(task, upload_interval=10)
+    clearml_logger = ClearMLLogger(task, upload_interval=100)
 
     # Initialize trainer without the ModelUploadCallback
     trainer = pl.Trainer(

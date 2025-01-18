@@ -1,5 +1,6 @@
 import streamlit as st
-import pandas as pd
+# Replace pandas with polars
+import polars as pl
 import plotly.graph_objects as go
 import torch
 from predictor import StockPredictor
@@ -47,7 +48,6 @@ def prepare_input_data(dataset, index):
         if not isinstance(actual_price, torch.Tensor):
             actual_price = torch.tensor(actual_price)
         
-        actual_price += input_data[-1].item()
         return input_data.numpy(), actual_price.item(), dataset.data
     except Exception as e:
         st.error(f"Error preparing input data: {str(e)}")
@@ -56,26 +56,26 @@ def prepare_input_data(dataset, index):
 def create_prediction_plot(day_data, input_data, actual_price, predictions, selected_date, use_log_scale=False):
     fig = go.Figure()
     
-    # Convert dictionary to DataFrame if necessary
     if isinstance(day_data, dict):
-        # Get the data for the selected stock (first key in dictionary)
         stock_symbol = list(day_data.keys())[0]
         day_data = day_data[stock_symbol]
-        
-    # Filter data for selected date
-    day_data = day_data[day_data['date'] == selected_date].copy()
-    day_data.reset_index(inplace=True)
     
-    # Plot historical data
+    # Filter data for selected date using Polars
+    day_data = day_data.filter(pl.col('timestamp').dt.date() == selected_date).sort('timestamp')
+    
+    # Create index for plotting
+    day_data = day_data.with_row_count('index')
+    
+    # Plot historical data using Polars DataFrame
     fig.add_trace(go.Scatter(
-        x=day_data['index'],
-        y=day_data['close'],
+        x=day_data['index'].to_list(),
+        y=day_data['close'].to_list(),
         name='Daily Data',
         line=dict(color='lightgray', dash='dot')
     ))
     
     # Plot input data - fixed alignment to start from beginning of day
-    input_times = day_data['index'].iloc[:len(input_data)]
+    input_times = day_data['index'].to_list()[:len(input_data)]
     input_values = [float(x) for x in input_data]
     
     fig.add_trace(go.Scatter(
@@ -90,7 +90,7 @@ def create_prediction_plot(day_data, input_data, actual_price, predictions, sele
     
     # Plot actual price and predictions
     target_idx = int(len(day_data) * MODEL_PARAMS['target_ratio'])
-    target_time = day_data['index'].iloc[target_idx]
+    target_time = day_data['index'].to_list()[target_idx]
     
     # Plot actual price
     fig.add_trace(go.Scatter(
@@ -128,56 +128,36 @@ def calculate_stock_performance(_model, test_data):  # <-- remove @st.cache_data
         return []
         
     performances = []
+    processed_data, date_symbols = test_data
     
-    for symbol in SYMBOLS:
-        if symbol in test_data:
-            try:
-                # Use 'train' mode for prediction dataset
-                pred_dataset = StockDataset({symbol: test_data[symbol]}, mode='train')
-                # Validate input dimensions
-                sample_input, _ = pred_dataset[0]
-                if sample_input.shape[0] != _model._input_size:  # Access protected attribute
-                    continue
-                
-                # Use 'viz' mode for visualization dataset
-                viz_dataset = StockDataset({symbol: test_data[symbol]}, mode='viz')
-                
-                if len(viz_dataset) > 0:
-                    for idx, (date, sym) in enumerate(viz_dataset.date_symbols):
-                        if sym == symbol:
-                            try:
-                                # Get visualization data for reference
-                                input_data = prepare_input_data(viz_dataset, idx)
-                                if input_data[0] is None:
-                                    continue
-                                if  input_data[0].shape[0] != _model._input_size:
-                                    continue
-                                
-                                input_values, actual_price,_ = input_data
-
-                                # Find corresponding index in prediction dataset
-                                pred_idx = pred_dataset.find_date_index(date)
-                                if pred_idx is None:
-                                    continue
-                                    
-                                # Get prediction using 'train' mode data
-                                pred_input, _ = pred_dataset[pred_idx]
-                                
-                                with torch.no_grad():
-                                    input_tensor = pred_input.unsqueeze(0)
-                                    predictions = _model(input_tensor)
-                                    predictions = predictions.squeeze().numpy() + input_values[-1]
-                                
-                                last_price = float(input_values[-1])
-                                min_prediction = float(np.min(predictions))
-                                performance = (min_prediction - last_price)/max(0.1, last_price)
-                                performances.append((symbol, date, performance, last_price))
-                            except Exception as e:
-                                st.warning(f"Error processing {symbol} on {date}: {str(e)}")
-                                continue
-            except Exception as e:
-                st.error(f"Error processing symbol {symbol}: {str(e)}")
+    for date, symbol in date_symbols:
+        try:
+            if symbol not in processed_data:
                 continue
+                
+            day_data = processed_data[symbol].get(date)
+            if day_data is None:
+                continue
+                
+            input_values, actual_price = day_data
+            input_array = input_values.to_numpy()
+            
+            if len(input_array) != _model._input_size:
+                continue
+                
+            with torch.no_grad():
+                input_tensor = torch.from_numpy(input_array).float().unsqueeze(0)
+                predictions = _model(input_tensor)
+                predictions = predictions.squeeze().numpy() + input_array[-1]
+            
+            last_price = float(input_array[-1])
+            min_prediction = float(np.min(predictions))
+            performance = (min_prediction - last_price)/max(0.1, last_price)
+            performances.append((symbol, date, performance, last_price))
+                
+        except Exception as e:
+            st.warning(f"Error processing {symbol} on {date}: {str(e)}")
+            continue
     
     return sorted(performances, key=lambda x: x[2], reverse=True)
 
@@ -195,7 +175,8 @@ def load_latest_metrics():
         if not os.path.exists(metrics_file):
             return None
             
-        df = pd.read_csv(metrics_file)
+        # Use Polars to read CSV
+        df = pl.read_csv(metrics_file)
         return df
     except Exception as e:
         st.error(f"Error loading metrics: {str(e)}")
@@ -219,24 +200,25 @@ def load_metrics_for_version(version):
         metrics_file = f"lightning_logs/version_{version}/metrics.csv"
         if not os.path.exists(metrics_file):
             return None
-        df = pd.read_csv(metrics_file)
+        # Use Polars to read CSV
+        df = pl.read_csv(metrics_file)
         return df
     except Exception as e:
         st.error(f"Error loading metrics for version {version}: {str(e)}")
         return None
 
 def plot_training_metrics(metrics_df, use_log_scale=False):
-    if metrics_df is None or metrics_df.empty:
+    if metrics_df is None or metrics_df.height == 0:  # Use Polars height instead of empty
         return None
         
     fig = go.Figure()
     
-    # Plot training loss with explicit visibility
+    # Plot training loss with explicit visibility using Polars
     if 'train_loss' in metrics_df.columns:
-        filtered_df = metrics_df[metrics_df['train_loss'].notna()]
+        filtered_df = metrics_df.filter(pl.col('train_loss').is_not_null())
         fig.add_trace(go.Scatter(
-            x=filtered_df['step'],
-            y=filtered_df['train_loss'],
+            x=filtered_df['step'].to_list(),
+            y=filtered_df['train_loss'].to_list(),
             name='Training Loss',
             mode='lines',
             line=dict(color='blue', width=2),
@@ -245,10 +227,10 @@ def plot_training_metrics(metrics_df, use_log_scale=False):
     
     # Plot validation loss with explicit visibility
     if 'val_loss' in metrics_df.columns:
-        filtered_df = metrics_df[metrics_df['val_loss'].notna()]
+        filtered_df = metrics_df.filter(pl.col('val_loss').is_not_null())
         fig.add_trace(go.Scatter(
-            x=filtered_df['step'],
-            y=filtered_df['val_loss'],
+            x=filtered_df['step'].to_list(),
+            y=filtered_df['val_loss'].to_list(),
             name='Validation Loss',
             mode='lines',
             line=dict(color='red', width=2),
@@ -334,8 +316,9 @@ def main():
         if not model_loaded:
             tab1.error("Predictions tab disabled - Model failed to load")
             return
-        test_data = load_stock_data()
-        performances = calculate_stock_performance(model, test_data)
+            
+        processed_data, date_symbols = load_stock_data()
+        performances = calculate_stock_performance(model, (processed_data, date_symbols))
         top_15_predictions = performances[:15]
         
         # Updated formatting to handle the values more safely
@@ -356,21 +339,22 @@ def main():
         selected_stock, selected_date = selected_option[1]
     
         # Modified the rest of the main function to use the selected date directly
-        if selected_stock in test_data:
-            test_df = test_data[selected_stock]
-            if test_df.empty:
+        if selected_stock in processed_data:
+            test_df = processed_data[selected_stock]
+            if isinstance(test_df, dict) and not test_df:  # Check if dict is empty
                 st.error(f"No data available for {selected_stock}")
                 return
                 
             # Create datasets for both modes
-            pred_dataset = StockDataset({selected_stock: test_df}, mode='train')
-            viz_dataset = StockDataset({selected_stock: test_df}, mode='viz')
+            symbol_data = {selected_stock: processed_data[selected_stock]}
+            symbol_dates = [(d, s) for d, s in date_symbols if s == selected_stock]
+            pred_dataset = StockDataset((symbol_data, symbol_dates))
             
-            if (selected_date, selected_stock) in viz_dataset.date_symbols:
-                # Get visualization data
-                viz_idx = viz_dataset.date_symbols.index((selected_date, selected_stock))
-                input_values, actual_price, day_data = prepare_input_data(viz_dataset, viz_idx)
-                
+            if (selected_date, selected_stock) in pred_dataset.date_symbols:
+                # Get data index
+                idx = pred_dataset.date_symbols.index((selected_date, selected_stock))
+                input_values, actual_price, day_data = prepare_input_data(pred_dataset, idx)
+
                 # Get prediction data
                 pred_idx = pred_dataset.find_date_index(selected_date)
                 if pred_idx is not None:
