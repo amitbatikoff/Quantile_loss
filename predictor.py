@@ -177,11 +177,11 @@ class StockPredictor(pl.LightningModule):
         outputs = self(inputs)  # Shape: [batch_size, num_quantiles]
         targets = targets.view(-1, 1)  # Shape: [batch_size, 1]
         loss = self.loss_fn(outputs, targets)
-        self.log('train_loss', loss, prog_bar=True)
+        self.log('loss/train', loss, prog_bar=True)
         
         # Log the learning rate
         lr = self.optimizers().param_groups[0]['lr']
-        self.log('learning_rate', lr, prog_bar=True)
+        self.log('learning_rate', lr, prog_bar=False)
         
         return loss
 
@@ -190,7 +190,7 @@ class StockPredictor(pl.LightningModule):
         outputs = self(inputs)
         targets = targets.view(-1, 1)
         loss = self.loss_fn(outputs, targets)
-        self.log('val_loss', loss, prog_bar=True)
+        self.log('loss/val', loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):

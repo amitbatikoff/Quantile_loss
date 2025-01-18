@@ -11,6 +11,8 @@ import pickle
 from clearml import Task
 from pytorch_lightning.loggers import TensorBoardLogger
 from clearml_logger import ClearMLLogger
+import logging
+logging.getLogger('clearml.frameworks').setLevel(logging.WARNING)
 
 def main():
     # Initialize ClearML task
@@ -90,15 +92,15 @@ def main():
 
     # Setup callbacks
     checkpoint_callback = pl.callbacks.ModelCheckpoint(
-        monitor='val_loss',
+        monitor='loss/val',
         dirpath='checkpoints',
-        filename='stock-predictor-{epoch:02d}-{val_loss:.2f}',
+        filename='stock-predictor-{epoch:02d}-{val_loss:.4f}',
         save_top_k=3,
         mode='min'
     )
 
     early_stop_callback = pl.callbacks.EarlyStopping(
-        monitor='val_loss',
+        monitor='loss/val',
         patience=150,
         mode='min'
     )
@@ -108,9 +110,9 @@ def main():
 
     # Create loggers
     tb_logger = TensorBoardLogger(save_dir='lightning_logs', name='quantile_loss')
-    clearml_logger = ClearMLLogger(task)
+    clearml_logger = ClearMLLogger(task, upload_interval=10)
 
-    # Initialize trainer with both loggers
+    # Initialize trainer without the ModelUploadCallback
     trainer = pl.Trainer(
         max_epochs=1000,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
@@ -126,9 +128,20 @@ def main():
     print("\nTraining unified model for all stocks")
     trainer.fit(model, train_loader, val_loader)
 
-    # Save model
+    # Save final model with metadata
+    final_val_loss = trainer.callback_metrics.get('loss/val', 0)
+    final_train_loss = trainer.callback_metrics.get('loss/train', 0)
+    
     torch.save(model.state_dict(), 'unified_stock_model.pt')
-    task.upload_artifact('unified_stock_model', 'unified_stock_model.pt')
+    task.upload_artifact(
+        'final_model',
+        'unified_stock_model.pt',
+        metadata={
+            'final_epoch': trainer.current_epoch,
+            'val_loss': float(final_val_loss),
+            'train_loss': float(final_train_loss),
+        }
+    )
 
 if __name__ == "__main__":
     main()
