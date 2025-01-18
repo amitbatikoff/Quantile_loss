@@ -9,7 +9,6 @@ with open(os.path.join(os.path.dirname(__file__), 'stock_list.json'), 'r') as f:
     SYMBOLS = json.load(f)['symbols']
 
 MODEL_PARAMS = {
-    "learning_rate": 1e-5,
     "input_ratio": 0.5,  # Added for consistency
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
@@ -19,11 +18,11 @@ MODEL_PARAMS = {
         "use_batch_norm": [False], 
         "attention": {
             "num_heads": 4,
-            "head_dim": 64,
-            "attention_dropout": 0.25
+            "head_dim": 32,
+            "attention_dropout": 0.4
         },
         "num_attention_blocks": 5,
-        "feedforward_dim": 64
+        "feedforward_dim": 32
     }
 }
 
@@ -37,4 +36,12 @@ DATA_PARAMS = {
     "last_year": "2025",
     "CACHE_DIR": "cache",
     "CACHE_EXPIRY_DAYS": 10
+}
+
+OPTIMIZER_PARAMS = {
+    "learning_rate": 1e-5,
+    "base_lr_factor": 0.1,
+    "step_size_up": 400,
+    "gamma": 0.999994,
+    "cycle_momentum": False
 }

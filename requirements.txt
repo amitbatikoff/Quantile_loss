@@ -9,3 +9,5 @@ plotly
 streamlit
 debugpy
 polars
+tensorboard
+tensorboardX

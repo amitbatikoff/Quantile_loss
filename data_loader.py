@@ -8,6 +8,7 @@ import os
 from datetime import datetime, timedelta
 from config import API_KEY, BASE_URL, MODEL_PARAMS, DATA_PARAMS
 from tqdm import trange
+from matplotlib import pyplot as plt
 
 def get_cache_path(symbol, interval, month=None):
     if not os.path.exists(DATA_PARAMS['CACHE_DIR']):
@@ -185,6 +186,8 @@ def process_day_data(day_data, mode='train', input_split=None):
         else:
             normalized_diffs = (21*(diffs - min_diff) / (max_diff - min_diff)).astype(np.int8)
             normalized_diffs = np.clip(normalized_diffs, -31, 31)
+            plt.plot(input_values)
+            plt.plot(normalized_diffs)
         return pl.Series(normalized_diffs)
     else:
         return pl.Series(input_values)

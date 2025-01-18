@@ -2,7 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from config import MODEL_PARAMS
+from config import MODEL_PARAMS, OPTIMIZER_PARAMS
 import matplotlib.pyplot as plt
 import math
 
@@ -178,6 +178,11 @@ class StockPredictor(pl.LightningModule):
         targets = targets.view(-1, 1)  # Shape: [batch_size, 1]
         loss = self.loss_fn(outputs, targets)
         self.log('train_loss', loss, prog_bar=True)
+        
+        # Log the learning rate
+        lr = self.optimizers().param_groups[0]['lr']
+        self.log('learning_rate', lr, prog_bar=True)
+        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -189,18 +194,19 @@ class StockPredictor(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        lr = MODEL_PARAMS['learning_rate']
+        lr = OPTIMIZER_PARAMS['learning_rate']
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer,
+            base_lr=lr * OPTIMIZER_PARAMS['base_lr_factor'],  # lower learning rate
+            max_lr=lr,      # upper learning rate
+            step_size_up=OPTIMIZER_PARAMS['step_size_up'],  # steps per half cycle
+            mode='exp_range',  # exponential scaling
+            gamma=OPTIMIZER_PARAMS['gamma'],    # decay factor
+            cycle_momentum=OPTIMIZER_PARAMS['cycle_momentum']  # don't cycle momentum
+        )
         scheduler_config = {
-            "scheduler": torch.optim.lr_scheduler.CyclicLR(
-                optimizer,
-                base_lr=lr/1000,  # lower learning rate
-                max_lr=lr,      # upper learning rate
-                step_size_up=200,  # steps per half cycle
-                mode='exp_range',  # exponential scaling
-                gamma=0.999994,    # decay factor
-                cycle_momentum=False  # don't cycle momentum
-            ),
+            "scheduler": scheduler,
             "interval": "step",  # update lr every step
             "frequency": 1,
         }

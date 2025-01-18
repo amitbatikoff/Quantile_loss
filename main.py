@@ -5,11 +5,21 @@ import multiprocessing
 from stock_dataset import StockDataset
 from predictor import StockPredictor
 from data_loader import get_stock_data, split_data
-from config import SYMBOLS, DATALOADER_PARAMS
+from config import SYMBOLS, DATALOADER_PARAMS, MODEL_PARAMS, DATA_PARAMS, OPTIMIZER_PARAMS
 import time
 import pickle
+from clearml import Task
+from pytorch_lightning.loggers import TensorBoardLogger
+from clearml_logger import ClearMLLogger
 
 def main():
+    # Initialize ClearML task
+    task = Task.init(project_name="1min pred", task_name="Quantile Loss Training")
+    task.connect(MODEL_PARAMS)
+    task.connect(DATALOADER_PARAMS)
+    task.connect(DATA_PARAMS)
+    task.connect(OPTIMIZER_PARAMS)
+    
     # Start time measurement
     print('start')
     start_time = time.time()
@@ -49,7 +59,7 @@ def main():
         val = pickle.load(f)
 
 
-    # task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
+    task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 
 
     # Worker and Batch Size Calculation
     num_workers = min(multiprocessing.cpu_count() - 1, 5)
@@ -96,15 +106,20 @@ def main():
     # Initialize lr scheduler callback
     lr_scheduler = pl.callbacks.LearningRateMonitor(logging_interval='step')
 
-    # Initialize trainer with scheduler
+    # Create loggers
+    tb_logger = TensorBoardLogger(save_dir='lightning_logs', name='quantile_loss')
+    clearml_logger = ClearMLLogger(task)
+
+    # Initialize trainer with both loggers
     trainer = pl.Trainer(
-        max_epochs=1500,
+        max_epochs=1000,
         callbacks=[checkpoint_callback, early_stop_callback, lr_scheduler],
         log_every_n_steps=1,
         deterministic=True,
         enable_model_summary=True,
-        gradient_clip_val=0.5,  # Added gradient clipping for stability
+        gradient_clip_val=0.5,
         enable_progress_bar=True,
+        logger=[tb_logger, clearml_logger]  # Use both loggers
     )
 
     # Train model
@@ -113,6 +128,7 @@ def main():
 
     # Save model
     torch.save(model.state_dict(), 'unified_stock_model.pt')
+    task.upload_artifact('unified_stock_model', 'unified_stock_model.pt')
 
 if __name__ == "__main__":
     main()
