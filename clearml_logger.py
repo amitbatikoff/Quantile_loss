@@ -35,7 +35,7 @@ class ClearMLLogger(LightningLoggerBase):
             val_loss = metrics['loss/val']
             epoch = step if step is not None else 0
             
-            if (epoch> 50) and ((self.best_val_loss-val_loss > 0.001) or (epoch % self.upload_interval == 0)):
+            if (epoch> 1000) and ((self.best_val_loss/val_loss > 1.05) or (epoch % self.upload_interval == 0)):
                 self.best_val_loss = min(val_loss, self.best_val_loss)
                 self._upload_model(epoch, metrics)
 

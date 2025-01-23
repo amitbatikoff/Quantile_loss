@@ -41,16 +41,16 @@ def main():
     # updated_hash = calculate_folder_hash('cache\\')
 
     # if saved_hash != updated_hash:
-    # stock_data = get_stock_data(SYMBOLS)
-    # print("Data Loading", "Time (seconds)", time.time() - start_time)
-    # start_time = time.time()
-    # train, val, _ = split_data(stock_data)
-    # print("Data Split", "Time (seconds)", time.time() - start_time)
+    stock_data = get_stock_data(SYMBOLS)
+    print("Data Loading", "Time (seconds)", time.time() - start_time)
+    start_time = time.time()
+    train, val, _ = split_data(stock_data)
+    print("Data Split", "Time (seconds)", time.time() - start_time)
 
-    # with open("train.pkl", "wb") as f:
-    #     pickle.dump(train, f)
-    # with open("val.pkl", "wb") as f:
-    #     pickle.dump(val, f)
+    with open("train.pkl", "wb") as f:
+        pickle.dump(train, f)
+    with open("val.pkl", "wb") as f:
+        pickle.dump(val, f)
 
         # with open("updated_hash.pkl", "wb") as f:
         #     pickle.dump(updated_hash, f)
@@ -110,7 +110,7 @@ def main():
 
     # Create loggers
     tb_logger = TensorBoardLogger(save_dir='lightning_logs', name='quantile_loss')
-    clearml_logger = ClearMLLogger(task, upload_interval=100)
+    clearml_logger = ClearMLLogger(task, upload_interval=500)
 
     # Initialize trainer without the ModelUploadCallback
     trainer = pl.Trainer(
