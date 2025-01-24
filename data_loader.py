@@ -115,7 +115,6 @@ def download_stock_data(symbol, interval="1min", month=None):
 
 def get_stock_data(symbols):
     stock_data = {}
-    all_timestamps = set()
     
     for i in trange(len(symbols)): 
         symbol = symbols[i]
@@ -123,11 +122,7 @@ def get_stock_data(symbols):
         if is_cache_valid(combined_cache_path):
             print(f"Loading combined cached data for {symbol}")
             df = pd.read_parquet(combined_cache_path)
-            # df = filter_and_fill(df)
-            # df.to_parquet(combined_cache_path, index=False)
-            
             stock_data[symbol] = df
-            all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
             continue
 
         # Download current data
@@ -148,18 +143,6 @@ def get_stock_data(symbols):
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
             df.to_parquet(combined_cache_path, index=False)
             stock_data[symbol] = df
-            all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
-    
-    # Convert string timestamps to datetime before creating Polars DataFrame
-    all_timestamps = sorted(list(all_timestamps))
-    all_timestamps = pd.to_datetime(all_timestamps)
-    
-    for symbol in stock_data:
-        df_polars = pl.from_pandas(stock_data[symbol])
-        full_ts = pl.DataFrame({"timestamp": pl.Series(all_timestamps)})
-        df_polars = full_ts.join(df_polars, on="timestamp", how="left")
-        df_polars = df_polars.fill_null(strategy="forward")
-        stock_data[symbol] = df_polars
     
     return stock_data
 
