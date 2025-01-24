@@ -150,20 +150,16 @@ def get_stock_data(symbols):
             stock_data[symbol] = df
             all_timestamps.update(df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S'))
     
-    # Rest of the function remains the same
+    # Convert string timestamps to datetime before creating Polars DataFrame
     all_timestamps = sorted(list(all_timestamps))
+    all_timestamps = pd.to_datetime(all_timestamps)
     
     for symbol in stock_data:
-        full_idx = pd.DatetimeIndex(all_timestamps)
-        stock_data[symbol] = (stock_data[symbol]
-            .set_index('timestamp')
-            .reindex(full_idx)
-            .reset_index()
-            .rename(columns={'index': 'timestamp'})
-        )
-    
-    # Convert to Polars DataFrames
-    stock_data = {symbol: pl.from_pandas(df) for symbol, df in stock_data.items()}
+        df_polars = pl.from_pandas(stock_data[symbol])
+        full_ts = pl.DataFrame({"timestamp": pl.Series(all_timestamps)})
+        df_polars = full_ts.join(df_polars, on="timestamp", how="left")
+        df_polars = df_polars.fill_null(strategy="forward")
+        stock_data[symbol] = df_polars
     
     return stock_data
 

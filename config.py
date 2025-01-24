@@ -13,16 +13,16 @@ MODEL_PARAMS = {
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
     "architecture": {
-        "hidden_sizes":   [16], 
+        "hidden_sizes":   [2], 
         "dropout_rates":  [0  ], 
         "use_batch_norm": [False], 
         "attention": {
             "num_heads": 8,
-            "head_dim": 64,
+            "head_dim": 16,
             "attention_dropout": 0.7
         },
-        "num_attention_blocks": 5,
-        "feedforward_dim": 64
+        "num_attention_blocks": 4,
+        "feedforward_dim": 16
     }
 }
 
@@ -32,15 +32,15 @@ DATALOADER_PARAMS = {
 
 DATA_PARAMS = {
     "train_end": 0.8,
-    "firtst_year": "2016",
+    "firtst_year": "2010",
     "last_year": "2024",
     "CACHE_DIR": "cache",
     "CACHE_EXPIRY_DAYS": 10000
 }
 
 OPTIMIZER_PARAMS = {
-    "learning_rate": 2e-5,
-    "base_lr_factor": 0.15,
+    "learning_rate": 4e-4,
+    "base_lr_factor": 0.1,
     "step_size_up": 400,
     "gamma": 0.999994,
     "cycle_momentum": True

@@ -40,7 +40,7 @@ def main():
     #         saved_hash = pickle.load(file)
     # updated_hash = calculate_folder_hash('cache\\')
 
-    # if saved_hash != updated_hash:
+    # # if saved_hash != updated_hash:
     stock_data = get_stock_data(SYMBOLS)
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     start_time = time.time()
