@@ -97,10 +97,11 @@ class T5Block(nn.Module):
             nn.ReLU(),
             nn.Linear(feedforward_dim, input_dim)
         )
+        self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        x = x + self.self_attn(self.ln1(x))
-        x = x + self.feedforward(self.ln2(x))
+        x = x + self.dropout(self.self_attn(self.ln1(x)))
+        x = x + self.dropout(self.feedforward(self.ln2(x)))
         return x
 
 class StockPredictor(pl.LightningModule):

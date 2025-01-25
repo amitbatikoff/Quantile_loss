@@ -80,6 +80,8 @@ def download_stock_data(symbol, interval="1min", month=None):
         
         df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
         df = filter_and_fill(df)
+        # if df is not None:
+        #     df = pl.from_pandas(df)
 
         return df
 
@@ -101,6 +103,8 @@ def download_stock_data(symbol, interval="1min", month=None):
             
             df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
             df = filter_and_fill(df)
+            # if df is not None:
+            #     df = pl.from_pandas(df)
         
             return df
         elif response.status_code == 429:
@@ -122,7 +126,8 @@ def get_stock_data(symbols):
         if is_cache_valid(combined_cache_path):
             print(f"Loading combined cached data for {symbol}")
             df = pd.read_parquet(combined_cache_path)
-            stock_data[symbol] = df
+            # df = filter_and_fill(df)
+            stock_data[symbol] =  pl.from_pandas(df)
             continue
 
         # Download current data
@@ -142,7 +147,7 @@ def get_stock_data(symbols):
             df = pd.concat([current_df] + future_dfs, ignore_index=True)
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
             df.to_parquet(combined_cache_path, index=False)
-            stock_data[symbol] = df
+            stock_data[symbol] = pl.from_pandas(df)
     
     return stock_data
 

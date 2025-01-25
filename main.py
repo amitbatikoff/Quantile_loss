@@ -16,7 +16,7 @@ logging.getLogger('clearml.frameworks').setLevel(logging.WARNING)
 
 def main():
     # Initialize ClearML task
-    task = Task.init(project_name="1min pred", task_name="Quantile Loss Training")
+    task = Task.init(project_name="1min pred", task_name="Data 2016 -> 2010")
     task.connect(MODEL_PARAMS)
     task.connect(DATALOADER_PARAMS)
     task.connect(DATA_PARAMS)
