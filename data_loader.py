@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from config import API_KEY, BASE_URL, MODEL_PARAMS, DATA_PARAMS
 from tqdm import trange
 from matplotlib import pyplot as plt
+import concurrent.futures
 
 def get_cache_path(symbol, interval, month=None):
     if not os.path.exists(DATA_PARAMS['CACHE_DIR']):
@@ -151,48 +152,103 @@ def get_stock_data(symbols):
     
     return stock_data
 
-def split_data(stock_data):
-    train, val, test = {}, {}, {}
-    train_symbols, val_symbols, test_symbols = [], [], []
-    
-    for symbol, df in stock_data.items():
-        df = df.sort('timestamp')
+def _split_single_symbol(item):
+    symbol, df = item
+    df = df.sort('timestamp')
         
-        days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
+    days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
 
-        train_end = int(len(days) * DATA_PARAMS['train_end'])
-        val_end = int(len(days))
+    train_end = int(len(days) * DATA_PARAMS['train_end'])
+    val_end = int(len(days))
 
-        # Split the data
-        train_df = df.filter(pl.col('date').is_in(days[:train_end]))
-        val_df = df.filter(pl.col('date').is_in(days[train_end:val_end]))
-        test_df = df.filter(pl.col('date').is_in(days[val_end:]))
+    # Split the data
+    train_df = df.filter(pl.col('date').is_in(days[:train_end]))
+    val_df = df.filter(pl.col('date').is_in(days[train_end:val_end]))
+    test_df = df.filter(pl.col('date').is_in(days[val_end:]))
 
-        # Process each split
-        if not train_df.is_empty():
-            train[symbol] = train_df
-            train_dates = train_df['timestamp'].dt.date().unique().to_list()
-            train_symbols.extend([(date, symbol) for date in train_dates])
+    train_symbols_i, val_symbols_i, test_symbols_i = [], [], []
+
+    # Process each split
+    if not train_df.is_empty():
+        train_dates = train_df['timestamp'].dt.date().unique().to_list()
+        train_symbols_i.extend([(date, symbol) for date in train_dates])
+        
+    if not val_df.is_empty():
+        val_dates = val_df['timestamp'].dt.date().unique().to_list()
+        val_symbols_i.extend([(date, symbol) for date in val_dates])
+        
+    if not test_df.is_empty():
+        test_dates = test_df['timestamp'].dt.date().unique().to_list()
+        test_symbols_i.extend([(date, symbol) for date in test_dates])
+
+    return (symbol, train_df, val_df, test_df, train_symbols_i, val_symbols_i, test_symbols_i)
+
+def split_data(stock_data, parallel=False):
+    if not parallel:
+        train, val, test = {}, {}, {}
+        train_symbols, val_symbols, test_symbols = [], [], []
+        
+        for symbol, df in stock_data.items():
+            df = df.sort('timestamp')
             
-        if not val_df.is_empty():
-            val[symbol] = val_df
-            val_dates = val_df['timestamp'].dt.date().unique().to_list()
-            val_symbols.extend([(date, symbol) for date in val_dates])
-            
-        if not test_df.is_empty():
-            test[symbol] = test_df
-            test_dates = test_df['timestamp'].dt.date().unique().to_list()
-            test_symbols.extend([(date, symbol) for date in test_dates])
+            days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
 
-    # Process data for each split
-    train_processed = prepare_dataset_data(train, train_symbols, 'train')
-    val_processed = prepare_dataset_data(val, val_symbols, 'train')
-    test_processed = prepare_dataset_data(test, test_symbols, 'viz')
-    
-    print(f"Train: {len(train_processed[0])} days, {sum(len(v) for v in train_processed[0].values())} data points")
-    print(f"Val: {len(val_processed[0])} days, {sum(len(v) for v in val_processed[0].values())} data points")
-    print(f"Test: {len(test_processed[0])} days, {sum(len(v) for v in test_processed[0].values())} data points")
-    return train_processed, val_processed, test_processed
+            train_end = int(len(days) * DATA_PARAMS['train_end'])
+            val_end = int(len(days))
+
+            # Split the data
+            train_df = df.filter(pl.col('date').is_in(days[:train_end]))
+            val_df = df.filter(pl.col('date').is_in(days[train_end:val_end]))
+            test_df = df.filter(pl.col('date').is_in(days[val_end:]))
+
+            # Process each split
+            if not train_df.is_empty():
+                train[symbol] = train_df
+                train_dates = train_df['timestamp'].dt.date().unique().to_list()
+                train_symbols.extend([(date, symbol) for date in train_dates])
+                
+            if not val_df.is_empty():
+                val[symbol] = val_df
+                val_dates = val_df['timestamp'].dt.date().unique().to_list()
+                val_symbols.extend([(date, symbol) for date in val_dates])
+                
+            if not test_df.is_empty():
+                test[symbol] = test_df
+                test_dates = test_df['timestamp'].dt.date().unique().to_list()
+                test_symbols.extend([(date, symbol) for date in test_dates])
+
+        # Process data for each split
+        train_processed = prepare_dataset_data(train, train_symbols, 'train')
+        val_processed = prepare_dataset_data(val, val_symbols, 'train')
+        test_processed = prepare_dataset_data(test, test_symbols, 'viz')
+        
+        print(f"Train: {len(train_processed[0])} days, {sum(len(v) for v in train_processed[0].values())} data points")
+        print(f"Val: {len(val_processed[0])} days, {sum(len(v) for v in val_processed[0].values())} data points")
+        print(f"Test: {len(test_processed[0])} days, {sum(len(v) for v in test_processed[0].values())} data points")
+        return train_processed, val_processed, test_processed
+    else:
+        train, val, test = {}, {}, {}
+        train_symbols, val_symbols, test_symbols = [], [], []
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = list(executor.map(_split_single_symbol, stock_data.items()))
+        for res in results:
+            symbol, tdf, vdf, sdf, tsym, vsym, ssym = res
+            if not tdf.is_empty():
+                train[symbol] = tdf
+                train_symbols.extend(tsym)
+            if not vdf.is_empty():
+                val[symbol] = vdf
+                val_symbols.extend(vsym)
+            if not sdf.is_empty():
+                test[symbol] = sdf
+                test_symbols.extend(ssym)
+        train_processed = prepare_dataset_data(train, train_symbols, 'train')
+        val_processed = prepare_dataset_data(val, val_symbols, 'train')
+        test_processed = prepare_dataset_data(test, test_symbols, 'viz')
+        print(f"Train: {len(train_processed[0])} days, {sum(len(v) for v in train_processed[0].values())} data points")
+        print(f"Val: {len(val_processed[0])} days, {sum(len(v) for v in val_processed[0].values())} data points")
+        print(f"Test: {len(test_processed[0])} days, {sum(len(v) for v in test_processed[0].values())} data points")
+        return train_processed, val_processed, test_processed
 
 def process_day_data(day_data, mode='train', input_split=None):
     """Process a single day's data for model input"""

@@ -44,7 +44,7 @@ def main():
     stock_data = get_stock_data(SYMBOLS)
     print("Data Loading", "Time (seconds)", time.time() - start_time)
     start_time = time.time()
-    train, val, _ = split_data(stock_data)
+    train, val, _ = split_data(stock_data,parallel=True)
     print("Data Split", "Time (seconds)", time.time() - start_time)
 
     with open("train.pkl", "wb") as f:
