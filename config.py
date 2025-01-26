@@ -17,12 +17,12 @@ MODEL_PARAMS = {
         "dropout_rates":  [0  ], 
         "use_batch_norm": [False], 
         "attention": {
-            "use_pos_enc": False,
+            "use_pos_enc": True,
             "num_heads": 4,
             "head_dim": 16,
             "attention_dropout": 0.1
         },
-        "num_attention_blocks": 7,
+        "num_attention_blocks": 4,
         "feedforward_dim": 16
     }
 }
@@ -33,7 +33,7 @@ DATALOADER_PARAMS = {
 
 DATA_PARAMS = {
     "train_end": 0.8,
-    "firtst_year": "2010",
+    "firtst_year": "2013",
     "last_year": "2024",
     "CACHE_DIR": "cache",
     "CACHE_EXPIRY_DAYS": 10000
