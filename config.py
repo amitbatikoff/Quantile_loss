@@ -17,11 +17,12 @@ MODEL_PARAMS = {
         "dropout_rates":  [0  ], 
         "use_batch_norm": [False], 
         "attention": {
-            "num_heads": 8,
+            "use_pos_enc": False,
+            "num_heads": 4,
             "head_dim": 16,
-            "attention_dropout": 0.7
+            "attention_dropout": 0.1
         },
-        "num_attention_blocks": 4,
+        "num_attention_blocks": 7,
         "feedforward_dim": 16
     }
 }
@@ -39,8 +40,8 @@ DATA_PARAMS = {
 }
 
 OPTIMIZER_PARAMS = {
-    "learning_rate": 4e-4,
-    "base_lr_factor": 0.1,
+    "learning_rate": 8e-4,
+    "base_lr_factor": 0.001,
     "step_size_up": 400,
     "gamma": 0.999994,
     "cycle_momentum": True

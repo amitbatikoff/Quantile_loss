@@ -125,7 +125,8 @@ class StockPredictor(pl.LightningModule):
         ])
         
         # Add positional encoding
-        layers.append(PositionalEncoding(d_model=prev_size))
+        if MODEL_PARAMS['architecture']['attention']['use_pos_enc']:
+            layers.append(PositionalEncoding(d_model=prev_size))
         
         # Add attention layer
         attn_config = MODEL_PARAMS['architecture']['attention']
