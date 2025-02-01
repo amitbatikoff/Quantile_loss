@@ -194,41 +194,41 @@ def split_data(stock_data, parallel=False):
     if not parallel:
         train, val, test = {}, {}, {}
         train_symbols, val_symbols, test_symbols = [], [], []
-        
         for symbol, df in stock_data.items():
             df = df.sort('timestamp')
-            
-            days = df.select(pl.col('date')).unique().sort('date')['date'].to_list()
-
-            train_end = int(len(days) * DATA_PARAMS['train_end'])
-            val_end = int(len(days))
-
-            # Split the data
-            train_df = df.filter(pl.col('date').is_in(days[:train_end]))
-            val_df = df.filter(pl.col('date').is_in(days[train_end:val_end]))
-            test_df = df.filter(pl.col('date').is_in(days[val_end:]))
-
-            # Process each split
-            if not train_df.is_empty():
+            # Compute unique sorted dates once
+            dates = sorted(df['date'].unique().to_list())
+            train_end = int(len(dates) * DATA_PARAMS['train_end'])
+            train_dates = set(dates[:train_end])
+            val_dates = set(dates[train_end:len(dates)])
+            test_dates = set()  # remains empty as in existing functionality
+            # Group rows by date to avoid repeated filtering
+            train_rows, val_rows, test_rows = [], [], []
+            for day, group in df.groupby('date'):
+                if day in train_dates:
+                    train_rows.append(group)
+                elif day in val_dates:
+                    val_rows.append(group)
+                elif day in test_dates:
+                    test_rows.append(group)
+            if train_rows:
+                train_df = pl.concat(train_rows)
                 train[symbol] = train_df
-                train_dates = train_df['timestamp'].dt.date().unique().to_list()
-                train_symbols.extend([(date, symbol) for date in train_dates])
-                
-            if not val_df.is_empty():
+                uniq_train_dates = train_df['timestamp'].dt.date().unique().to_list()
+                train_symbols.extend([(d, symbol) for d in uniq_train_dates])
+            if val_rows:
+                val_df = pl.concat(val_rows)
                 val[symbol] = val_df
-                val_dates = val_df['timestamp'].dt.date().unique().to_list()
-                val_symbols.extend([(date, symbol) for date in val_dates])
-                
-            if not test_df.is_empty():
+                uniq_val_dates = val_df['timestamp'].dt.date().unique().to_list()
+                val_symbols.extend([(d, symbol) for d in uniq_val_dates])
+            if test_rows:
+                test_df = pl.concat(test_rows)
                 test[symbol] = test_df
-                test_dates = test_df['timestamp'].dt.date().unique().to_list()
-                test_symbols.extend([(date, symbol) for date in test_dates])
-
-        # Process data for each split
+                uniq_test_dates = test_df['timestamp'].dt.date().unique().to_list()
+                test_symbols.extend([(d, symbol) for d in uniq_test_dates])
         train_processed = prepare_dataset_data(train, train_symbols, 'train')
         val_processed = prepare_dataset_data(val, val_symbols, 'train')
         test_processed = prepare_dataset_data(test, test_symbols, 'viz')
-        
         print(f"Train: {len(train_processed[0])} days, {sum(len(v) for v in train_processed[0].values())} data points")
         print(f"Val: {len(val_processed[0])} days, {sum(len(v) for v in val_processed[0].values())} data points")
         print(f"Test: {len(test_processed[0])} days, {sum(len(v) for v in test_processed[0].values())} data points")
@@ -305,20 +305,15 @@ def prepare_dataset_data(data_dict, date_symbols, mode='train'):
     
     for symbol, df in data_dict.items():
         processed_data[symbol] = {}
-        for date in df['timestamp'].dt.date().unique():
-            day_data = df.filter(pl.col('timestamp').dt.date() == date)
-            if len(day_data) == 0:
-                continue
-                
+        unique_dates = df['date'].unique().to_list()  # Get unique dates using polars
+        for day in unique_dates:
+            day_data = df.filter(pl.col('date') == day)  # Filter for each date
             input_split = int(len(day_data) * MODEL_PARAMS['input_ratio'])
             target_split = int(len(day_data) * MODEL_PARAMS['target_ratio'])
             
-            # Process input values
             input_values = process_day_data(day_data, mode, input_split)
+            target_value = day_data['close'][target_split:].max() - day_data['close'][input_split-1]
             
-            # Calculate target
-            target_value = (day_data['close'][target_split:].max() - day_data['close'][input_split-1])
-            
-            processed_data[symbol][date] = (input_values, target_value)
+            processed_data[symbol][day] = (input_values, target_value)
     
     return processed_data, date_symbols

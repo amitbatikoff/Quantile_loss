@@ -16,7 +16,7 @@ logging.getLogger('clearml.frameworks').setLevel(logging.WARNING)
 
 def main():
     # Initialize ClearML task
-    task = Task.init(project_name="1min pred", task_name="2015>2012")
+    task = Task.init(project_name="1min pred", task_name="plot worst case")
     task.connect(MODEL_PARAMS)
     task.connect(DATALOADER_PARAMS)
     task.connect(DATA_PARAMS)
@@ -47,18 +47,18 @@ def main():
     # train, val, _ = split_data(stock_data,parallel=True)
     # print("Data Split", "Time (seconds)", time.time() - start_time)
 
-    with open("train.pkl", "wb") as f:
-        pickle.dump(train, f)
-    with open("val.pkl", "wb") as f:
-        pickle.dump(val, f)
+    # with open("train.pkl", "wb") as f:
+    #     pickle.dump(train, f)
+    # with open("val.pkl", "wb") as f:
+    #     pickle.dump(val, f)
 
         # with open("updated_hash.pkl", "wb") as f:
         #     pickle.dump(updated_hash, f)
     # else:
-    # with open("train.pkl", "rb") as f:
-    #     train = pickle.load(f)
-    # with open("val.pkl", "rb") as f:
-    #     val = pickle.load(f)
+    with open("train.pkl", "rb") as f:
+        train = pickle.load(f)
+    with open("val.pkl", "rb") as f:
+        val = pickle.load(f)
 
 
     task.get_logger().report_scalar("Data Loading", "Time (seconds)", time.time() - start_time,0) 

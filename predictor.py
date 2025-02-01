@@ -5,6 +5,7 @@ import torch.optim as optim
 from config import MODEL_PARAMS, OPTIMIZER_PARAMS
 import matplotlib.pyplot as plt
 import math
+import numpy as np  # Added import for numpy
 
 class QuantileLoss(nn.Module):
     def __init__(self, quantiles):
@@ -163,6 +164,7 @@ class StockPredictor(pl.LightningModule):
         
         self.model = nn.Sequential(*layers)
         self.loss_fn = QuantileLoss(self.quantiles)
+        self.validation_step_outputs = []  # Initialize container for validation outputs
 
     @property
     def input_size(self):
@@ -190,46 +192,71 @@ class StockPredictor(pl.LightningModule):
         outputs = self(inputs)
         targets = targets.view(-1, 1)
         loss = self.loss_fn(outputs, targets)
-        # Compute per-sample loss without averaging over batch
-        per_sample_loss = self.loss_fn(outputs, targets, reduction='none')  # Shape: [batch]
+        per_sample_loss = self.loss_fn(outputs, targets, reduction='none')  # [batch]
         max_loss, max_idx = per_sample_loss.max(dim=0)
         worst_input = inputs[max_idx]
         worst_target = targets[max_idx]
         worst_output = outputs[max_idx]
         self.log('loss/val', loss, prog_bar=True)
-        return {
+        batch_output = {
             "loss": loss,
             "max_loss": max_loss.item(),
             "worst_input": worst_input.detach().cpu(),
             "worst_target": worst_target.detach().cpu(),
             "worst_output": worst_output.detach().cpu()
         }
+        self.validation_step_outputs.append(batch_output)
+        return batch_output
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         worst_sample = None
         worst_loss = -float('inf')
-        for out in outputs:
+        for out in self.validation_step_outputs:
             if out["max_loss"] > worst_loss:
                 worst_loss = out["max_loss"]
                 worst_sample = out
-        # Log worst example info to ClearML if logger with task is available:
         if worst_sample is not None and hasattr(self, "trainer"):
             for logger in self.trainer.loggers:
                 if hasattr(logger, "task"):
-                    info = (f"Epoch {self.current_epoch}: Worst sample with loss = {worst_loss:.4f}\n"
-                            f"Input: {worst_sample['worst_input']}\n"
-                            f"Target: {worst_sample['worst_target']}\n"
-                            f"Output: {worst_sample['worst_output']}")
-                    logger.task.get_logger().report_text(
-                        title="Worst Example",
-                        series="validation",
+                    # Prepare scatter2d data using worst_input values
+                    worst_input_np = worst_sample["worst_input"].cpu().numpy().flatten()
+                    scatter2d = np.hstack((
+                        np.atleast_2d(np.arange(len(worst_input_np))).T,
+                        worst_input_np.reshape(-1, 1)
+                    ))
+                    # Report 2d scatter plot with lines
+                    logger.task.get_logger().report_scatter2d(
+                        title="Worst Sample Input",
+                        series="lines",
                         iteration=self.current_epoch,
-                        value=info
+                        scatter=scatter2d,
+                        xaxis="Index",
+                        yaxis="Value"
+                    )
+                    # Report 2d scatter plot with markers
+                    logger.task.get_logger().report_scatter2d(
+                        title="Worst Sample Input",
+                        series="markers",
+                        iteration=self.current_epoch,
+                        scatter=scatter2d,
+                        xaxis="Index",
+                        yaxis="Value",
+                        mode='markers'
+                    )
+                    # Report 2d scatter plot with lines and markers
+                    logger.task.get_logger().report_scatter2d(
+                        title="Worst Sample Input",
+                        series="lines+markers",
+                        iteration=self.current_epoch,
+                        scatter=scatter2d,
+                        xaxis="Index",
+                        yaxis="Value",
+                        mode='lines+markers'
                     )
                     break
-        # Optionally, log the overall validation loss (unchanged)
-        avg_loss = torch.stack([torch.tensor(out["loss"]) for out in outputs]).mean()
+        avg_loss = torch.stack([torch.tensor(out["loss"]) for out in self.validation_step_outputs]).mean()
         self.log('loss/val_epoch', avg_loss)
+        self.validation_step_outputs.clear()
 
     def configure_optimizers(self):
         lr = OPTIMIZER_PARAMS['learning_rate']
