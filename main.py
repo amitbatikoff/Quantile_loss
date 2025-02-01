@@ -16,7 +16,7 @@ logging.getLogger('clearml.frameworks').setLevel(logging.WARNING)
 
 def main():
     # Initialize ClearML task
-    task = Task.init(project_name="1min pred", task_name="2010>2013")
+    task = Task.init(project_name="1min pred", task_name="2015>2012")
     task.connect(MODEL_PARAMS)
     task.connect(DATALOADER_PARAMS)
     task.connect(DATA_PARAMS)
@@ -41,11 +41,11 @@ def main():
     # updated_hash = calculate_folder_hash('cache\\')
 
     # # if saved_hash != updated_hash:
-    stock_data = get_stock_data(SYMBOLS)
-    print("Data Loading", "Time (seconds)", time.time() - start_time)
-    start_time = time.time()
-    train, val, _ = split_data(stock_data,parallel=True)
-    print("Data Split", "Time (seconds)", time.time() - start_time)
+    # stock_data = get_stock_data(SYMBOLS)
+    # print("Data Loading", "Time (seconds)", time.time() - start_time)
+    # start_time = time.time()
+    # train, val, _ = split_data(stock_data,parallel=True)
+    # print("Data Split", "Time (seconds)", time.time() - start_time)
 
     with open("train.pkl", "wb") as f:
         pickle.dump(train, f)

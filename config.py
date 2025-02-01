@@ -33,7 +33,7 @@ DATALOADER_PARAMS = {
 
 DATA_PARAMS = {
     "train_end": 0.8,
-    "firtst_year": "2013",
+    "firtst_year": "2012",
     "last_year": "2024",
     "CACHE_DIR": "cache",
     "CACHE_EXPIRY_DAYS": 10000

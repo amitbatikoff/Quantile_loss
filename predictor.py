@@ -11,20 +11,18 @@ class QuantileLoss(nn.Module):
         super(QuantileLoss, self).__init__()
         self.register_buffer('quantiles', torch.tensor(quantiles, dtype=torch.float32))
 
-    def forward(self, preds, target):
-        # Ensure quantiles are on the same device as preds
+    def forward(self, preds, target, reduction='mean'):
         quantiles = self.quantiles.to(preds.device)
-
-        # preds shape: [batch_size, num_quantiles]
-        # target shape: [batch_size, 1]
         target = target.expand_as(preds)
         errors = target - preds
-        loss = torch.max(
-            (quantiles - 1) * errors,
-            quantiles * errors
-        )
-        return loss.mean()
-    
+        loss = torch.max((quantiles - 1) * errors, quantiles * errors)
+        if reduction == 'mean':
+            return loss.mean()
+        elif reduction == 'none':
+            # Average over quantiles only, resulting in per-sample loss (shape: [batch_size])
+            return loss.mean(dim=1)
+        else:
+            return loss
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, input_dim, num_heads, head_dim, dropout=0.1):
@@ -192,8 +190,46 @@ class StockPredictor(pl.LightningModule):
         outputs = self(inputs)
         targets = targets.view(-1, 1)
         loss = self.loss_fn(outputs, targets)
+        # Compute per-sample loss without averaging over batch
+        per_sample_loss = self.loss_fn(outputs, targets, reduction='none')  # Shape: [batch]
+        max_loss, max_idx = per_sample_loss.max(dim=0)
+        worst_input = inputs[max_idx]
+        worst_target = targets[max_idx]
+        worst_output = outputs[max_idx]
         self.log('loss/val', loss, prog_bar=True)
-        return loss
+        return {
+            "loss": loss,
+            "max_loss": max_loss.item(),
+            "worst_input": worst_input.detach().cpu(),
+            "worst_target": worst_target.detach().cpu(),
+            "worst_output": worst_output.detach().cpu()
+        }
+
+    def validation_epoch_end(self, outputs):
+        worst_sample = None
+        worst_loss = -float('inf')
+        for out in outputs:
+            if out["max_loss"] > worst_loss:
+                worst_loss = out["max_loss"]
+                worst_sample = out
+        # Log worst example info to ClearML if logger with task is available:
+        if worst_sample is not None and hasattr(self, "trainer"):
+            for logger in self.trainer.loggers:
+                if hasattr(logger, "task"):
+                    info = (f"Epoch {self.current_epoch}: Worst sample with loss = {worst_loss:.4f}\n"
+                            f"Input: {worst_sample['worst_input']}\n"
+                            f"Target: {worst_sample['worst_target']}\n"
+                            f"Output: {worst_sample['worst_output']}")
+                    logger.task.get_logger().report_text(
+                        title="Worst Example",
+                        series="validation",
+                        iteration=self.current_epoch,
+                        value=info
+                    )
+                    break
+        # Optionally, log the overall validation loss (unchanged)
+        avg_loss = torch.stack([torch.tensor(out["loss"]) for out in outputs]).mean()
+        self.log('loss/val_epoch', avg_loss)
 
     def configure_optimizers(self):
         lr = OPTIMIZER_PARAMS['learning_rate']

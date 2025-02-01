@@ -29,7 +29,9 @@ def is_cache_valid(cache_path):
     return cache_time > expiry_time
 
 def filter_and_fill(df):
-    # Extract date from timestamp
+    # Extract date from 
+    df = df[['timestamp', 'close']].copy()
+
     df['date'] = df['timestamp'].dt.date  
 
     # Group by date and validate times
@@ -83,7 +85,7 @@ def download_stock_data(symbol, interval="1min", month=None):
     if is_cache_valid(cache_path):
         print(f"Loading cached data for {symbol} {'(current)' if month is None else f'({month})'}")
         df = pd.read_parquet(cache_path)
-        df = optimize_memory_usage(df)
+        # df = optimize_memory_usage(df)
         # Verify if any day has fewer than 100 rows
         df = filter_and_fill(df)
         # if df is not None:
@@ -104,7 +106,7 @@ def download_stock_data(symbol, interval="1min", month=None):
             df = pd.read_csv(StringIO(response.text))
             if df.empty:
                 raise ValueError(f"Empty data received for {symbol}")
-            df = optimize_memory_usage(df)
+            # df = optimize_memory_usage(df)
             df['timestamp'] = pd.to_datetime(df['timestamp'])
             df['date'] = df['timestamp'].dt.date  # Extract date from timestamp
             df = filter_and_fill(df)
@@ -131,7 +133,7 @@ def get_stock_data(symbols):
         if is_cache_valid(combined_cache_path):
             print(f"Loading combined cached data for {symbol}")
             df = pd.read_parquet(combined_cache_path)
-            df = optimize_memory_usage(df)
+            # df = optimize_memory_usage(df)
             # df = filter_and_fill(df)
             stock_data[symbol] =  pl.from_pandas(df)
             continue
