@@ -176,15 +176,39 @@ class StockPredictor(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         inputs, targets = batch
-        outputs = self(inputs)  # Shape: [batch_size, num_quantiles]
-        targets = targets.view(-1, 1)  # Shape: [batch_size, 1]
-        loss = self.loss_fn(outputs, targets)
-        self.log('loss/train', loss, prog_bar=True)
+        outputs = self(inputs)
+        targets = targets.view(-1, 1)
+        # Compute per-sample loss
+        per_sample_loss = self.loss_fn(outputs, targets, reduction='none')  # shape: [batch]
         
+        # Compute input norms to detect out-of-distribution examples
+        norms = torch.norm(inputs.view(inputs.shape[0], -1), p=2, dim=1)
+        # Get OOD threshold and amplification factor from config if available, otherwise use defaults
+        ood_threshold = MODEL_PARAMS.get('ood_threshold', 10.0)
+        amplification_factor = MODEL_PARAMS.get('ood_amplification', 2.0)
+        # Identify OOD samples and amplify their losses
+        ood_mask = norms > ood_threshold
+        
+        # Log number of OOD samples to clearML
+        ood_count = int(ood_mask.sum().item())
+        if hasattr(self, "trainer"):
+            for logger in self.trainer.loggers:
+                if hasattr(logger, "task"):
+                    logger.task.get_logger().report_scalar(
+                        title="Out-of-Distribution Samples",
+                        series="train",
+                        iteration=self.global_step,
+                        value=ood_count
+                    )
+                    break
+        
+        per_sample_loss = per_sample_loss * (amplification_factor * ood_mask.float() + (~ood_mask).float())
+        loss = per_sample_loss.mean()
+        
+        self.log('loss/train', loss, prog_bar=True)
         # Log the learning rate
         lr = self.optimizers().param_groups[0]['lr']
         self.log('learning_rate', lr, prog_bar=False)
-        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -254,7 +278,7 @@ class StockPredictor(pl.LightningModule):
                         mode='lines+markers'
                     )
                     break
-        avg_loss = torch.stack([torch.tensor(out["loss"]) for out in self.validation_step_outputs]).mean()
+        avg_loss = torch.stack([out["loss"] for out in self.validation_step_outputs]).mean()
         self.log('loss/val_epoch', avg_loss)
         self.validation_step_outputs.clear()
 

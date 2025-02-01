@@ -12,6 +12,8 @@ MODEL_PARAMS = {
     "input_ratio": 0.5,  # Added for consistency
     "target_ratio": 0.6,  # Added for consistency
     "quantiles": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "ood_threshold": 10,
+    "ood_amplification": 2,
     "architecture": {
         "hidden_sizes":   [2], 
         "dropout_rates":  [0  ], 
