@@ -133,26 +133,22 @@ def get_stock_data(symbols):
         if is_cache_valid(combined_cache_path):
             print(f"Loading combined cached data for {symbol}")
             df = pd.read_parquet(combined_cache_path)
-            # df = optimize_memory_usage(df)
-            # df = filter_and_fill(df)
-            stock_data[symbol] =  pl.from_pandas(df)
+            stock_data[symbol] = pl.from_pandas(df)
             continue
 
-        # Download current data
-        current_df = download_stock_data(symbol)
-        
-        # Download data for the months April 2024 to June 2024
+        # Download historical data only
         future_dfs = []
         months = [f"{yy}-{mm:02d}" for yy in range(int(DATA_PARAMS['firtst_year']), int(DATA_PARAMS['last_year']) + 1)
                   for mm in range(1, 13)]
+        
         for month in months:
             future_df = download_stock_data(symbol, month=month)
             if future_df is not None:
                 future_dfs.append(future_df)
         
-        # Combine the dataframes if both current and future data are available
-        if current_df is not None and future_dfs:
-            df = pd.concat([current_df] + future_dfs, ignore_index=True)
+        # Combine the dataframes if we have historical data
+        if future_dfs:
+            df = pd.concat(future_dfs, ignore_index=True)
             df = df.drop_duplicates(subset=['timestamp'], keep='first')
             df.to_parquet(combined_cache_path, index=False)
             stock_data[symbol] = pl.from_pandas(df)
@@ -264,16 +260,19 @@ def process_day_data(day_data, mode='train', input_split=None):
     if mode == 'train':
         # Calculate normalized price differences
         diffs = np.diff(input_values, prepend=input_values[0])
+        diffs = input_values - input_values[0]
+        if input_values[0] != 0:
+            diffs = diffs / input_values[0]
         max_diff = np.percentile(diffs, 99)
         min_diff = np.percentile(diffs, 1)
         
         if (max_diff - min_diff) == 0:
             normalized_diffs = np.zeros_like(diffs)
         else:
-            normalized_diffs = (11*(diffs - np.mean(diffs)) / (max_diff - min_diff)).astype(np.int8)
+            normalized_diffs = (11*(diffs) / (max_diff - min_diff)).astype(np.int8)
             normalized_diffs = np.clip(normalized_diffs, -21, 21)
-            # plt.plot(input_values)
-            # plt.plot(normalized_diffs)
+            plt.plot(input_values)
+            plt.plot(normalized_diffs)
         return pl.Series(normalized_diffs)
     else:
         return pl.Series(input_values)

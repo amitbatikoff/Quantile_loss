@@ -11,3 +11,7 @@ debugpy
 polars
 tensorboard
 tensorboardX
+scikit-learn
+seaborn
+UMAP
+umap-learn
